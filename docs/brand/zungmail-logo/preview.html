@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZungMail · Logo 规范</title>
+<style>
+  :root{
+    --ink:#0E1A3C; --muted:#6B7A96; --line:#E4E9F2; --blue:#2F63F7; --deep:#2B18A6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);
+       background:#F6F8FC;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:56px 32px 80px}
+  header{display:flex;align-items:center;gap:22px;margin-bottom:8px}
+  header svg{width:72px;height:72px;flex:0 0 auto}
+  h1{font-size:34px;margin:0;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:14px;margin:6px 0 0}
+  h2{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+      margin:56px 0 18px;font-weight:600}
+  .card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:36px}
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .hero .pad{display:flex;align-items:center;justify-content:center;border-radius:16px;padding:44px}
+  .light{background:#fff;border:1px solid var(--line)}
+  .dark{background:#0B1229}
+  .hero .pad svg{width:180px;height:180px}
+  .sizes{display:flex;align-items:flex-end;gap:28px;flex-wrap:wrap}
+  .sz{text-align:center;color:var(--muted);font-size:12px}
+  .sz span{display:block;margin-top:10px}
+  .sz svg{display:block;width:100%;height:100%}
+  .lock{display:grid;gap:18px}
+  .lock .pad{padding:34px 40px;border-radius:16px;display:flex;align-items:center}
+  .lock svg{width:100%;max-width:420px;height:auto}
+  .swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .sw{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#fff}
+  .sw .chip{height:92px}
+  .sw .meta{padding:12px 14px;font-size:12px;line-height:1.6}
+  .sw .meta b{display:block;font-size:13px;color:var(--ink)}
+  .notes{color:var(--muted);font-size:13px;line-height:1.9;margin:0;padding-left:18px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  @media (max-width:760px){.hero,.grid2,.swatches{grid-template-columns:1fr}}
+</style></head>
+<body><div class="wrap">
+  <header>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+
+    <div>
+      <h1>ZungMail</h1>
+      <p class="sub">邮件客户端 · 应用图标与品牌标识 · 2026</p>
+    </div>
+  </header>
+
+  <h2>主图标</h2>
+  <div class="hero">
+    <div class="pad light"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div>
+    <div class="pad dark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div>
+  </div>
+
+  <h2>尺寸适配</h2>
+  <div class="card"><div class="sizes">
+      <div class="sz"><div style="width:128px;height:128px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>128px</span></div>
+      <div class="sz"><div style="width:96px;height:96px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>96px</span></div>
+      <div class="sz"><div style="width:64px;height:64px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>64px</span></div>
+      <div class="sz"><div style="width:48px;height:48px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>48px</span></div>
+      <div class="sz"><div style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>32px</span></div>
+      <div class="sz"><div style="width:24px;height:24px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>24px</span></div>
+      <div class="sz"><div style="width:16px;height:16px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>
+</div><span>16px</span></div>
+  </div></div>
+
+  <h2>横版组合标</h2>
+  <div class="lock">
+    <div class="pad light"><svg xmlns="http://www.w3.org/2000/svg" width="596" height="160" viewBox="0 0 596 160">
+  <title>ZungMail</title>
+  <g transform="translate(0 14) scale(0.2578)">
+  <defs>
+    <linearGradient id="i_bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="i_glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="i_depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="i_letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="i_soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="i_clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#i_bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#i_glow)"/>
+  <g clip-path="url(#i_clip)">
+    <rect y="268" width="512" height="244" fill="url(#i_depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#i_letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#i_soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+  </g>
+  <g transform="translate(172 114) scale(0.68)">
+    <path d="M80.54 -92.75 25.73 -14.02H79.85V0.00H2.51V-7.60L57.53 -85.91H6.76V-100.00H80.54Z M155.02 0.00H138.85V-11.30H138.57Q131.52 1.67 116.67 1.67Q91.36 1.67 91.36 -28.73V-71.41H107.54V-30.40Q107.54 -11.16 122.39 -11.16Q129.57 -11.16 134.21 -16.46Q138.85 -21.76 138.85 -30.33V-71.41H155.02Z M238.08 0.00H221.90V-40.24Q221.90 -60.25 207.75 -60.25Q200.36 -60.25 195.54 -54.71Q190.73 -49.16 190.73 -40.73V0.00H174.48V-71.41H190.73V-59.55H191.01Q199.03 -73.08 214.16 -73.08Q225.81 -73.08 231.95 -65.52Q238.08 -57.95 238.08 -43.65Z M321.21 -5.72Q321.21 33.61 281.67 33.61Q267.72 33.61 257.33 28.94V14.16Q269.05 20.85 279.58 20.85Q305.03 20.85 305.03 -4.18V-11.99H304.75Q296.73 1.67 280.63 1.67Q267.58 1.67 259.60 -7.85Q251.62 -17.36 251.62 -33.40Q251.62 -51.60 260.19 -62.34Q268.77 -73.08 283.76 -73.08Q297.92 -73.08 304.75 -61.51H305.03V-71.41H321.21ZM305.17 -32.71V-41.98Q305.17 -49.51 300.19 -54.85Q295.20 -60.18 287.74 -60.18Q278.53 -60.18 273.34 -53.38Q268.14 -46.58 268.14 -34.38Q268.14 -23.85 273.13 -17.54Q278.11 -11.23 286.34 -11.23Q294.71 -11.23 299.94 -17.26Q305.17 -23.29 305.17 -32.71Z" fill="#12235F"/>
+    <path d="M449.88 0.00H433.42V-64.71Q433.42 -72.66 434.39 -84.17H434.12Q432.58 -77.62 431.40 -74.76L401.55 0.00H390.11L360.20 -74.20Q358.94 -77.48 357.55 -84.17H357.27Q357.83 -78.17 357.83 -64.57V0.00H342.48V-100.00H365.85L392.14 -33.40Q395.13 -25.73 396.04 -21.97H396.39Q398.97 -29.85 400.57 -33.68L427.35 -100.00H449.88Z M525.89 0.00H510.20V-11.16H509.92Q502.53 1.67 488.23 1.67Q477.70 1.67 471.74 -4.04Q465.78 -9.76 465.78 -19.18Q465.78 -39.40 489.07 -42.75L510.27 -45.75Q510.27 -61.02 495.77 -61.02Q483.00 -61.02 472.75 -52.23V-66.39Q484.05 -73.08 498.83 -73.08Q525.89 -73.08 525.89 -46.44ZM510.27 -35.08 495.28 -32.98Q488.30 -32.08 484.78 -29.60Q481.26 -27.13 481.26 -20.92Q481.26 -16.39 484.50 -13.49Q487.75 -10.60 493.19 -10.60Q500.58 -10.60 505.42 -15.79Q510.27 -20.99 510.27 -28.87Z M552.19 -86.40Q548.21 -86.40 545.39 -88.98Q542.56 -91.56 542.56 -95.54Q542.56 -99.51 545.39 -102.16Q548.21 -104.81 552.19 -104.81Q556.30 -104.81 559.16 -102.16Q562.02 -99.51 562.02 -95.54Q562.02 -91.77 559.16 -89.09Q556.30 -86.40 552.19 -86.40ZM560.20 0.00H544.03V-71.41H560.20Z M595.98 0.00H579.73V-105.72H595.98Z" fill="#2F63F7"/>
+  </g>
+</svg>
+</div>
+    <div class="pad dark"><svg xmlns="http://www.w3.org/2000/svg" width="596" height="160" viewBox="0 0 596 160">
+  <title>ZungMail</title>
+  <g transform="translate(0 14) scale(0.2578)">
+  <defs>
+    <linearGradient id="i_bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="i_glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="i_depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="i_letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="i_soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="i_clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#i_bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#i_glow)"/>
+  <g clip-path="url(#i_clip)">
+    <rect y="268" width="512" height="244" fill="url(#i_depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#i_letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#i_soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+  </g>
+  <g transform="translate(172 114) scale(0.68)">
+    <path d="M80.54 -92.75 25.73 -14.02H79.85V0.00H2.51V-7.60L57.53 -85.91H6.76V-100.00H80.54Z M155.02 0.00H138.85V-11.30H138.57Q131.52 1.67 116.67 1.67Q91.36 1.67 91.36 -28.73V-71.41H107.54V-30.40Q107.54 -11.16 122.39 -11.16Q129.57 -11.16 134.21 -16.46Q138.85 -21.76 138.85 -30.33V-71.41H155.02Z M238.08 0.00H221.90V-40.24Q221.90 -60.25 207.75 -60.25Q200.36 -60.25 195.54 -54.71Q190.73 -49.16 190.73 -40.73V0.00H174.48V-71.41H190.73V-59.55H191.01Q199.03 -73.08 214.16 -73.08Q225.81 -73.08 231.95 -65.52Q238.08 -57.95 238.08 -43.65Z M321.21 -5.72Q321.21 33.61 281.67 33.61Q267.72 33.61 257.33 28.94V14.16Q269.05 20.85 279.58 20.85Q305.03 20.85 305.03 -4.18V-11.99H304.75Q296.73 1.67 280.63 1.67Q267.58 1.67 259.60 -7.85Q251.62 -17.36 251.62 -33.40Q251.62 -51.60 260.19 -62.34Q268.77 -73.08 283.76 -73.08Q297.92 -73.08 304.75 -61.51H305.03V-71.41H321.21ZM305.17 -32.71V-41.98Q305.17 -49.51 300.19 -54.85Q295.20 -60.18 287.74 -60.18Q278.53 -60.18 273.34 -53.38Q268.14 -46.58 268.14 -34.38Q268.14 -23.85 273.13 -17.54Q278.11 -11.23 286.34 -11.23Q294.71 -11.23 299.94 -17.26Q305.17 -23.29 305.17 -32.71Z" fill="#FFFFFF"/>
+    <path d="M449.88 0.00H433.42V-64.71Q433.42 -72.66 434.39 -84.17H434.12Q432.58 -77.62 431.40 -74.76L401.55 0.00H390.11L360.20 -74.20Q358.94 -77.48 357.55 -84.17H357.27Q357.83 -78.17 357.83 -64.57V0.00H342.48V-100.00H365.85L392.14 -33.40Q395.13 -25.73 396.04 -21.97H396.39Q398.97 -29.85 400.57 -33.68L427.35 -100.00H449.88Z M525.89 0.00H510.20V-11.16H509.92Q502.53 1.67 488.23 1.67Q477.70 1.67 471.74 -4.04Q465.78 -9.76 465.78 -19.18Q465.78 -39.40 489.07 -42.75L510.27 -45.75Q510.27 -61.02 495.77 -61.02Q483.00 -61.02 472.75 -52.23V-66.39Q484.05 -73.08 498.83 -73.08Q525.89 -73.08 525.89 -46.44ZM510.27 -35.08 495.28 -32.98Q488.30 -32.08 484.78 -29.60Q481.26 -27.13 481.26 -20.92Q481.26 -16.39 484.50 -13.49Q487.75 -10.60 493.19 -10.60Q500.58 -10.60 505.42 -15.79Q510.27 -20.99 510.27 -28.87Z M552.19 -86.40Q548.21 -86.40 545.39 -88.98Q542.56 -91.56 542.56 -95.54Q542.56 -99.51 545.39 -102.16Q548.21 -104.81 552.19 -104.81Q556.30 -104.81 559.16 -102.16Q562.02 -99.51 562.02 -95.54Q562.02 -91.77 559.16 -89.09Q556.30 -86.40 552.19 -86.40ZM560.20 0.00H544.03V-71.41H560.20Z M595.98 0.00H579.73V-105.72H595.98Z" fill="#7FB2FF"/>
+  </g>
+</svg>
+</div>
+  </div>
+
+  <h2>色彩</h2>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#2F63F7"></div>
+      <div class="meta"><b>Brand Blue</b>#2F63F7</div></div>
+    <div class="sw"><div class="chip" style="background:#2B18A6"></div>
+      <div class="meta"><b>Deep Indigo</b>#2B18A6</div></div>
+    <div class="sw"><div class="chip" style="background:#22D3BF"></div>
+      <div class="meta"><b>Signal Mint</b>#22D3BF</div></div>
+    <div class="sw"><div class="chip" style="background:#12235F"></div>
+      <div class="meta"><b>Ink Navy</b>#12235F</div></div>
+  </div>
+
+  <h2>设计说明</h2>
+  <div class="card">
+    <ul class="notes">
+      <li>以首字母 <b>Z</b> 作为唯一记忆点：一笔连续的折线，斜笔与信纸的折角共用同一条对角线。</li>
+      <li>字形为几何构造，笔画统一为 52 单位；折角处保留锐角，两端收圆头，硬朗中带手感，缩到 16px 仍清晰可辨。</li>
+      <li>圆角方形底板取 118/512 的圆角率，贴合系统级应用图标；左上高光、底部压暗形成轻微体积感，不做多余描边。</li>
+      <li>薄荷绿 <b>#22D3BF</b> 保留为产品内的信号色（未读、在线、完成），只出现在界面中，不进入图标，保证图标在任务栏始终干净。</li>
+      <li>深色背景请使用纯白单色标记，不要叠加阴影；最小使用尺寸 16px，安全边距不小于图标边长的 1/8。</li>
+    </ul>
+  </div>
+</div></body></html>

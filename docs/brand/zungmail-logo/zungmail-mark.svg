@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>ZungMail mark</title>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="#FFFFFF" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round"/>
+  </g>
+</svg>

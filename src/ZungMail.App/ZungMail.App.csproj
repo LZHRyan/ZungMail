@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>ZungMail.App</RootNamespace>
+    <AssemblyName>ZungMail</AssemblyName>
+    <ApplicationIcon>Assets\Brand\ZungMail.ico</ApplicationIcon>
+    <!-- 自带应用清单：真实 assemblyIdentity + supportedOS + longPathAware，
+         替代 .NET apphost 默认的 MyApplication.app 通用清单（安全软件的启发式会看这些） -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 启用 WinForms 仅为托盘图标（WPF 无内置 NotifyIcon）。
+         移除其隐式 using，避免 MessageBox / Application 等类型与 System.Windows 冲突。 -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.8.5" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <!-- 正文 HTML 渲染：本机已缓存 1.0.3179.45，可离线还原 -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
+    <!-- Fluent 设计系统：窗口外壳、ContentDialog、Snackbar、ProgressRing 与基础控件样式 -->
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZungMail.Application\ZungMail.Application.csproj" />
+    <ProjectReference Include="..\ZungMail.Core\ZungMail.Core.csproj" />
+    <ProjectReference Include="..\ZungMail.Infrastructure\ZungMail.Infrastructure.csproj" />
+    <ProjectReference Include="..\ZungMail.Mail\ZungMail.Mail.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 品牌资源：ApplicationIcon 同时写入可执行文件，供任务栏、Alt+Tab 与资源管理器使用；
+         两档 PNG 供界面内直接显示（22px 标题栏用 64、44px 关于页用 256），避免缩放 256 帧发虚。 -->
+    <Resource Include="Assets\Brand\ZungMail.ico" />
+    <Resource Include="Assets\Brand\ZungMailMark64.png" />
+    <Resource Include="Assets\Brand\ZungMailMark.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 富文本编辑器静态资源：运行时通过虚拟主机 zungmail.editor 加载 -->
+    <None Remove="Assets\editor\**" />
+    <Content Include="Assets\editor\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <!-- 离线 HTML 使用教程：随程序发布，设置 → 关于直接打开，不依赖网络 -->
+    <None Remove="Assets\help\**" />
+    <Content Include="Assets\help\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
+

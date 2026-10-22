@@ -1,0 +1,28 @@
+services:
+  update-server:
+    build:
+      context: ../..
+      dockerfile: packaging/update-server/Dockerfile
+    image: zungmail-update-server:1.0.0
+    container_name: zungmail-update-server
+    restart: unless-stopped
+    ports:
+      # 只暴露给内网时把 0.0.0.0 换成宿主机内网地址，例如 192.168.1.20:8080:8080
+      - "8080:8080"
+    environment:
+      # 不设置时服务会在数据卷里生成 initial-admin-password.txt，首次登录后请立即修改
+      UPDATESERVER_ADMIN_PASSWORD: "change-this-admin-password"
+      UPDATESERVER_DATA: /data
+      # 反向代理到子路径时设置，例如 /updates
+      # UPDATESERVER_PATH_BASE: /updates
+    volumes:
+      - update-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  update-data:

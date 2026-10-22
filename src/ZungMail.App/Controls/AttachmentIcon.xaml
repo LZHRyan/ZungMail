@@ -1,0 +1,24 @@
+<UserControl x:Class="ZungMail.App.Controls.AttachmentIcon"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             Focusable="False"
+             IsHitTestVisible="False">
+    <!-- 附件类型徽标：彩色圆角底 + 白色矢量图标，随 IconSize 等比缩放 -->
+    <Grid x:Name="IconGrid">
+        <Border x:Name="Badge"
+                Background="{Binding FileName, ElementName=Root, Converter={StaticResource FileTypeBrush}}"
+                SnapsToDevicePixels="True" />
+        <Path x:Name="GlyphMark"
+              Data="{Binding FileName, ElementName=Root, Converter={StaticResource FileTypeGlyph}}"
+              Fill="{x:Null}"
+              Stroke="White"
+              StrokeThickness="1.65"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              StrokeLineJoin="Round"
+              Stretch="Uniform"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center" />
+    </Grid>
+</UserControl>

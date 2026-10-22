@@ -1,0 +1,49 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 暗色调色板：取值对齐 Windows 11 Fluent 2 默认深色（#202020 层面 + #60CDFF 强调色）。
+         键名保持不变，界面里成百上千处 DynamicResource 无需改写。 -->
+
+    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#1C1C1C" />
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#202020" />
+    <SolidColorBrush x:Key="ChromeBrush" Color="#202020" />
+    <SolidColorBrush x:Key="SidebarBrush" Color="#202020" />
+    <SolidColorBrush x:Key="ListBrush" Color="#272727" />
+    <SolidColorBrush x:Key="ReaderBrush" Color="#202020" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#2D2D2D" />
+    <SolidColorBrush x:Key="SelectedBrush" Color="#1F3A5F" />
+
+    <SolidColorBrush x:Key="SelectedLineBrush" Color="#60CDFF" />
+    <SolidColorBrush x:Key="InkBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="Ink2Brush" Color="#C5C5C5" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#9D9D9D" />
+    <SolidColorBrush x:Key="RuleBrush" Color="#2E2E2E" />
+    <SolidColorBrush x:Key="RuleStrongBrush" Color="#3D3D3D" />
+
+    <SolidColorBrush x:Key="AccentBrush" Color="#60CDFF" />
+    <SolidColorBrush x:Key="Accent2Brush" Color="#3DC2B0" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#2660CDFF" />
+    <SolidColorBrush x:Key="Accent2SoftBrush" Color="#263DC2B0" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#000000" />
+
+    <SolidColorBrush x:Key="OkDotBrush" Color="#3DC2B0" />
+    <SolidColorBrush x:Key="WarnDotBrush" Color="#FCD34D" />
+    <SolidColorBrush x:Key="ErrorDotBrush" Color="#FF99A4" />
+
+    <!-- 存储空间分级预警 -->
+    <SolidColorBrush x:Key="NoticeBrush" Color="#60CDFF" />
+    <SolidColorBrush x:Key="NoticeSoftBrush" Color="#2660CDFF" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#FCD34D" />
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="#26FCD34D" />
+    <SolidColorBrush x:Key="CriticalBrush" Color="#FF99A4" />
+    <SolidColorBrush x:Key="CriticalSoftBrush" Color="#26FF99A4" />
+
+    <SolidColorBrush x:Key="BadgeGrayBrush" Color="#9D9D9D" />
+    <SolidColorBrush x:Key="BadgeGrayBackgroundBrush" Color="#299D9D9D" />
+
+    <LinearGradientBrush x:Key="BrandMarkBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#60CDFF" Offset="0" />
+        <GradientStop Color="#3DC2B0" Offset="1" />
+    </LinearGradientBrush>
+
+</ResourceDictionary>

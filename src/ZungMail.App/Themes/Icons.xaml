@@ -1,0 +1,95 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 图标几何：由 docs/ui/index.html 的内联 SVG 精灵转写为路径数据（统一 24×24 视图框，描边渲染） -->
+
+    <PathGeometry x:Key="IcoMail" Figures="M5 4.5 H19 A2.5 2.5 0 0 1 21.5 7 V17 A2.5 2.5 0 0 1 19 19.5 H5 A2.5 2.5 0 0 1 2.5 17 V7 A2.5 2.5 0 0 1 5 4.5 Z M3 7 L12 13 L21 7" />
+    <PathGeometry x:Key="IcoSearch" Figures="M11 4 A7 7 0 1 0 11 18 A7 7 0 1 0 11 4 Z M20 20 L16.4 16.4" />
+    <PathGeometry x:Key="IcoCompose" Figures="M12 20 L21 20 M16.5 3.5 A2.12 2.12 0 0 1 19.5 6.5 L7 19 L3 20 L4 16 Z" />
+    <PathGeometry x:Key="IcoReply" Figures="M9 17 L4 12 L9 7 M20 18 L20 16.5 A4.5 4.5 0 0 0 15.5 12 L4 12" />
+    <PathGeometry x:Key="IcoForward" Figures="M15 17 L20 12 L15 7 M4 18 L4 16.5 A4.5 4.5 0 0 1 8.5 12 L20 12" />
+    <PathGeometry x:Key="IcoTrash" Figures="M3.5 6 L20.5 6 M8.5 6 L8.5 4 L15.5 4 L15.5 6 M18.5 6 L17.6 20 L6.4 20 L5.5 6 M10 11 L10 16 M14 11 L14 16" />
+    <PathGeometry x:Key="IcoStar" Figures="M12 3.5 L14.7 9 L20.7 9.9 L16.35 14.15 L17.38 20.15 L12 17.32 L6.62 20.2 L7.65 14.2 L3.3 9.9 L9.3 9 Z" />
+    <PathGeometry x:Key="IcoMore" Figures="M5 10.3 A1.7 1.7 0 1 0 5 13.7 A1.7 1.7 0 1 0 5 10.3 Z M12 10.3 A1.7 1.7 0 1 0 12 13.7 A1.7 1.7 0 1 0 12 10.3 Z M19 10.3 A1.7 1.7 0 1 0 19 13.7 A1.7 1.7 0 1 0 19 10.3 Z" />
+    <!-- 刷新 / 同步中的转圈：3/4 圆弧，配旋转动画（见主窗口刷新按钮） -->
+    <PathGeometry x:Key="IcoSpinner" Figures="M12 3 A9 9 0 1 1 3 12" />
+    <!-- 上下文侧边栏：外框 + 右侧分栏线，一眼看出是「右栏」开关 -->
+    <PathGeometry x:Key="IcoPanelRight" Figures="M4 4.5 H20 A1.5 1.5 0 0 1 21.5 6 V18 A1.5 1.5 0 0 1 20 19.5 H4 A1.5 1.5 0 0 1 2.5 18 V6 A1.5 1.5 0 0 1 4 4.5 Z M15.5 4.5 V19.5" />
+    <PathGeometry x:Key="IcoRefresh" Figures="M20.5 12 A8.5 8.5 0 1 1 18 6 M20.5 4 L20.5 9 L15.5 9" />
+    <PathGeometry x:Key="IcoChevron" Figures="M6 9.5 L12 15.5 L18 9.5" />
+    <PathGeometry x:Key="IcoPaperclip" Figures="M20.5 11.5 L12.6 19.4 A4.8 4.8 0 0 1 5.8 12.6 L13.6 4.8 A3.2 3.2 0 0 1 18.1 9.3 L10.3 17.1 A1.6 1.6 0 0 1 8 14.8 L15.1 7.7" />
+    <!-- 打印：出纸 + 机身 + 进纸 + 指示灯（阅读工具条原来错用了回形针） -->
+    <PathGeometry x:Key="IcoPrint" Figures="M7 14.5 H17 V20 H7 Z M6.5 14.5 H5 A1.5 1.5 0 0 1 3.5 13 V10.5 A1.5 1.5 0 0 1 5 9 H19 A1.5 1.5 0 0 1 20.5 10.5 V13 A1.5 1.5 0 0 1 19 14.5 H17.5 M7 9 V4.5 H17 V9 M16.2 11.4 L16.2 12" />
+    <!-- 设置：8 齿齿轮 + 中心轴孔（原来是「圆 + 8 条放射线」，在小尺寸下像太阳/加载图标） -->
+    <PathGeometry x:Key="IcoGear" Figures="M18.31 10.07 L22.27 10.37 L22.27 13.63 L18.31 13.93 L17.83 15.10 L20.41 18.11 L18.11 20.41 L15.10 17.83 L13.93 18.31 L13.63 22.27 L10.37 22.27 L10.07 18.31 L8.90 17.83 L5.89 20.41 L3.59 18.11 L6.17 15.10 L5.69 13.93 L1.73 13.63 L1.73 10.37 L5.69 10.07 L6.17 8.90 L3.59 5.89 L5.89 3.59 L8.90 6.17 L10.07 5.69 L10.37 1.73 L13.63 1.73 L13.93 5.69 L15.10 6.17 L18.11 3.59 L20.41 5.89 L17.83 8.90 Z M12 8.80 A3.2 3.2 0 1 0 12 15.20 A3.2 3.2 0 1 0 12 8.80 Z" />
+    <PathGeometry x:Key="IcoInfo" Figures="M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M12 10.8 L12 16.6 M12 7.4 L12 8.02" />
+    <PathGeometry x:Key="IcoMoon" Figures="M21 12.8 A9 9 0 1 1 11.2 3 A7 7 0 0 0 21 12.8 Z" />
+    <PathGeometry x:Key="IcoSun" Figures="M12 7.8 A4.2 4.2 0 1 0 12 16.2 A4.2 4.2 0 1 0 12 7.8 Z M12 2.6 L12 5 M12 19 L12 21.4 M2.6 12 L5 12 M19 12 L21.4 12 M5.3 5.3 L7 7 M17 17 L18.7 18.7 M18.7 5.3 L17 7 M7 17 L5.3 18.7" />
+    <PathGeometry x:Key="IcoLock" Figures="M6.5 10.5 H17.5 A1.5 1.5 0 0 1 19 12 V19.5 A1.5 1.5 0 0 1 17.5 21 H6.5 A1.5 1.5 0 0 1 5 19.5 V12 A1.5 1.5 0 0 1 6.5 10.5 Z M8.2 10.5 V7.8 A3.8 3.8 0 0 1 15.8 7.8 V10.5 M12 14.4 V17.6" />
+    <PathGeometry x:Key="IcoMin" Figures="M5 12 L19 12" />
+    <PathGeometry x:Key="IcoMax" Figures="M7 5.5 H17 A1.5 1.5 0 0 1 18.5 7 V17 A1.5 1.5 0 0 1 17 18.5 H7 A1.5 1.5 0 0 1 5.5 17 V7 A1.5 1.5 0 0 1 7 5.5 Z" />
+    <PathGeometry x:Key="IcoRestore" Figures="M9 5.5 H17 A1.5 1.5 0 0 1 18.5 7 V15 M5.5 9 H14 A1.5 1.5 0 0 1 15.5 10.5 V17.5 A1.5 1.5 0 0 1 14 19 H5.5 A1.5 1.5 0 0 1 4 17.5 V10.5 A1.5 1.5 0 0 1 5.5 9 Z" />
+    <PathGeometry x:Key="IcoClose" Figures="M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5" />
+    <PathGeometry x:Key="IcoInbox" Figures="M3 12.5 L7 12.5 L8.8 15.3 L15.2 15.3 L17 12.5 L21 12.5 M5 5 L19 5 L21 12.5 L21 17 A2 2 0 0 1 19 19 L5 19 A2 2 0 0 1 3 17 L3 12.5 Z" />
+    <PathGeometry x:Key="IcoSend" Figures="M21 3 L3 10.5 L10 13.5 L13 20.5 Z M21 3 L10 13.5" />
+    <PathGeometry x:Key="IcoDraft" Figures="M14 3 H7 A2 2 0 0 0 5 5 V19 A2 2 0 0 0 7 21 H17 A2 2 0 0 0 19 19 V8 Z M14 3 L14 8 L19 8" />
+    <PathGeometry x:Key="IcoJunk" Figures="M12 3.5 L3.2 20 L20.8 20 Z M12 9.5 L12 14 M12 16.4 L12 17.01" />
+    <PathGeometry x:Key="IcoUsers" Figures="M9 4.8 A3.2 3.2 0 1 0 9 11.2 A3.2 3.2 0 1 0 9 4.8 Z M3.5 20 A5.5 5.5 0 0 1 14.5 20 M16.2 5.4 A3 3 0 0 1 16.2 11 M17.5 19.5 A5.6 5.6 0 0 0 16.3 16" />
+    <PathGeometry x:Key="IcoClock" Figures="M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M12 7 L12 12 L15.5 14" />
+    <PathGeometry x:Key="IcoTemplate" Figures="M6 3 H18 A2 2 0 0 1 20 5 V19 A2 2 0 0 1 18 21 H6 A2 2 0 0 1 4 19 V5 A2 2 0 0 1 6 3 Z M8 8 L16 8 M8 12 L16 12 M8 16 L13 16" />
+    <PathGeometry x:Key="IcoCheck" Figures="M20 6.5 L9.5 17 L4 11.5" />
+    <!-- 复制：两张叠放的纸张（查看邮件源码的「复制全部」） -->
+    <PathGeometry x:Key="IcoCopy" Figures="M8.5 8.5 H18 A1.5 1.5 0 0 1 19.5 10 V19.5 A1.5 1.5 0 0 1 18 21 H8.5 A1.5 1.5 0 0 1 7 19.5 V10 A1.5 1.5 0 0 1 8.5 8.5 Z M5.5 15.5 H5 A1.5 1.5 0 0 1 3.5 14 V4.5 A1.5 1.5 0 0 1 5 3 H14 A1.5 1.5 0 0 1 15.5 4.5 V5" />
+    <!-- 另存为：向下箭头 + 托盘（查看邮件源码的「另存为 .eml」） -->
+    <PathGeometry x:Key="IcoSave" Figures="M12 3 L12 15 M8 11 L12 15 L16 11 M4 17 L4 19 A2 2 0 0 0 6 21 L18 21 A2 2 0 0 0 20 19 L20 17" />
+    <PathGeometry x:Key="IcoPlus" Figures="M12 5.5 L12 18.5 M5.5 12 L18.5 12" />
+    <PathGeometry x:Key="IcoCalendar" Figures="M5.5 5 H18.5 A2 2 0 0 1 20.5 7 V19 A2 2 0 0 1 18.5 21 H5.5 A2 2 0 0 1 3.5 19 V7 A2 2 0 0 1 5.5 5 Z M3.5 10 L20.5 10 M8 3 L8 7 M16 3 L16 7" />
+    <PathGeometry x:Key="IcoFolder" Figures="M3 7 A1.5 1.5 0 0 1 4.5 5.5 H9.2 L11.2 8 H19.5 A1.5 1.5 0 0 1 21 9.5 V17.5 A1.5 1.5 0 0 1 19.5 19 H4.5 A1.5 1.5 0 0 1 3 17.5 Z" />
+    <!-- 拾色器：色轮 + 三个色点 -->
+    <PathGeometry x:Key="IcoPalette" Figures="M12 3 A9 9 0 1 1 11.99 3 Z M8 9 A1.3 1.3 0 1 1 7.99 9 Z M15.2 9 A1.3 1.3 0 1 1 15.19 9 Z M9.2 14.6 A1.3 1.3 0 1 1 9.19 14.6 Z" />
+
+    <PathGeometry x:Key="IcoArchive" Figures="M3 4.5 H21 V8.5 H3 Z M5 8.5 V19 A1.5 1.5 0 0 0 6.5 20.5 H17.5 A1.5 1.5 0 0 0 19 19 V8.5 M10 12.5 L14 12.5" />
+    <PathGeometry x:Key="IcoPower" Figures="M12 3.2 V11.4 M7.3 6.1 A7 7 0 1 0 16.7 6.1" />
+    <PathGeometry x:Key="IcoDatabase" Figures="M12 3 C7.6 3 4.5 4.2 4.5 5.5 V18.5 C4.5 19.8 7.6 21 12 21 C16.4 21 19.5 19.8 19.5 18.5 V5.5 C19.5 4.2 16.4 3 12 3 Z M4.5 5.5 C4.5 6.8 7.6 8 12 8 C16.4 8 19.5 6.8 19.5 5.5 M4.5 12 C4.5 13.3 7.6 14.5 12 14.5 C16.4 14.5 19.5 13.3 19.5 12" />
+
+    <!-- ============ 附件类型图标（24×24 视图框，白色描边，绘制在彩色徽标上） ============ -->
+
+    <!-- Word：页面 + 折角 + W -->
+    <PathGeometry x:Key="IcoFileDoc" Figures="M6.5 2.5 H13.5 L18.5 7.5 V19.5 A2 2 0 0 1 16.5 21.5 H6.5 A2 2 0 0 1 4.5 19.5 V4.5 A2 2 0 0 1 6.5 2.5 Z M13.5 2.5 V7.5 H18.5 M8 12.5 L9.2 17 L11.4 13.6 L13.6 17 L14.8 12.5" />
+    <!-- Excel：页面 + 折角 + X -->
+    <PathGeometry x:Key="IcoFileXls" Figures="M6.5 2.5 H13.5 L18.5 7.5 V19.5 A2 2 0 0 1 16.5 21.5 H6.5 A2 2 0 0 1 4.5 19.5 V4.5 A2 2 0 0 1 6.5 2.5 Z M13.5 2.5 V7.5 H18.5 M8.3 12.3 L14.7 17.2 M14.7 12.3 L8.3 17.2" />
+    <!-- PowerPoint：页面 + 折角 + 柱状图 -->
+    <PathGeometry x:Key="IcoFilePpt" Figures="M6.5 2.5 H13.5 L18.5 7.5 V19.5 A2 2 0 0 1 16.5 21.5 H6.5 A2 2 0 0 1 4.5 19.5 V4.5 A2 2 0 0 1 6.5 2.5 Z M13.5 2.5 V7.5 H18.5 M8.6 17.4 V14 M11.5 17.4 V11.6 M14.4 17.4 V13" />
+    <!-- PDF：页面 + 折角 + P -->
+    <PathGeometry x:Key="IcoFilePdf" Figures="M6.5 2.5 H13.5 L18.5 7.5 V19.5 A2 2 0 0 1 16.5 21.5 H6.5 A2 2 0 0 1 4.5 19.5 V4.5 A2 2 0 0 1 6.5 2.5 Z M13.5 2.5 V7.5 H18.5 M9 17.5 V11.2 H11.9 A2.1 2.1 0 0 1 11.9 15.4 H9" />
+    <!-- 纯文本：页面 + 折角 + 文本行 -->
+    <PathGeometry x:Key="IcoFileTxt" Figures="M6.5 2.5 H13.5 L18.5 7.5 V19.5 A2 2 0 0 1 16.5 21.5 H6.5 A2 2 0 0 1 4.5 19.5 V4.5 A2 2 0 0 1 6.5 2.5 Z M13.5 2.5 V7.5 H18.5 M8 12.2 H15 M8 15 H15 M8 17.8 H12.6" />
+    <!-- 图片：相框 + 太阳 + 山形 -->
+    <PathGeometry x:Key="IcoFileImage" Figures="M5.5 4.5 H18.5 A2 2 0 0 1 20.5 6.5 V17.5 A2 2 0 0 1 18.5 19.5 H5.5 A2 2 0 0 1 3.5 17.5 V6.5 A2 2 0 0 1 5.5 4.5 Z M3.9 16.4 L8.6 11.7 L12.4 15.5 M13.2 14.6 L16 11.8 L20.1 15.9 M15.7 8.2 A1.35 1.35 0 1 0 15.7 10.9 A1.35 1.35 0 1 0 15.7 8.2 Z" />
+    <!-- 压缩包：盒盖 + 盒身 + 拉链口 -->
+    <PathGeometry x:Key="IcoFileZip" Figures="M3.5 4.5 H20.5 V8.5 H3.5 Z M5.5 8.5 V19 A1.5 1.5 0 0 0 7 20.5 H17 A1.5 1.5 0 0 0 18.5 19 V8.5 M10.2 12 H13.8" />
+    <!-- 音频：双联音符 -->
+    <PathGeometry x:Key="IcoFileAudio" Figures="M9.5 17.2 V6.8 L19 4.8 V15.2 M9.5 17.2 A2.1 2.1 0 1 1 5.3 17.2 A2.1 2.1 0 1 1 9.5 17.2 Z M19 15.2 A2.1 2.1 0 1 1 14.8 15.2 A2.1 2.1 0 1 1 19 15.2 Z" />
+    <!-- 视频：画面 + 播放三角 -->
+    <PathGeometry x:Key="IcoFileVideo" Figures="M5 5.5 H19 A2 2 0 0 1 21 7.5 V16.5 A2 2 0 0 1 19 18.5 H5 A2 2 0 0 1 3 16.5 V7.5 A2 2 0 0 1 5 5.5 Z M10 9 L15.4 12 L10 15 Z" />
+    <!-- 默认文件：仅页面 + 折角，与纯文本图标区分 -->
+    <PathGeometry x:Key="IcoFileGeneric" Figures="M6.5 2.5 H13.5 L18.5 7.5 V19.5 A2 2 0 0 1 16.5 21.5 H6.5 A2 2 0 0 1 4.5 19.5 V4.5 A2 2 0 0 1 6.5 2.5 Z M13.5 2.5 V7.5 H18.5" />
+
+    <!-- 自绘对话框图标：警示三角 / 错误圆叉 / 询问圆圈 -->
+    <PathGeometry x:Key="IcoAlert" Figures="M12 3.5 L21.2 20 H2.8 Z M12 9.6 L12 14.3 M12 16.8 L12 17.5" />
+    <PathGeometry x:Key="IcoError" Figures="M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M9.2 9.2 L14.8 14.8 M14.8 9.2 L9.2 14.8" />
+    <PathGeometry x:Key="IcoQuestion" Figures="M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M9.4 9.4 A2.7 2.7 0 0 1 14.4 10.3 C14.4 12.1 12 12.2 12 14.1 M12 16.9 L12 17.6" />
+
+    <!-- 附件徽标底色：按类型区分，白描边图标在明暗主题下均保持可读 -->
+    <SolidColorBrush x:Key="FileBadgeDocBrush" Color="#2E5FA8" />
+    <SolidColorBrush x:Key="FileBadgeXlsBrush" Color="#1E7A4D" />
+    <SolidColorBrush x:Key="FileBadgePptBrush" Color="#C4613C" />
+    <SolidColorBrush x:Key="FileBadgePdfBrush" Color="#B6443C" />
+    <SolidColorBrush x:Key="FileBadgeTxtBrush" Color="#6E7C8F" />
+    <SolidColorBrush x:Key="FileBadgeImageBrush" Color="#7C5CC7" />
+    <SolidColorBrush x:Key="FileBadgeZipBrush" Color="#A87E39" />
+    <SolidColorBrush x:Key="FileBadgeAudioBrush" Color="#A8558B" />
+    <SolidColorBrush x:Key="FileBadgeVideoBrush" Color="#5762C6" />
+    <SolidColorBrush x:Key="FileBadgeDefaultBrush" Color="#7D889C" />
+
+</ResourceDictionary>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>邮件编辑</title>
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<div class="shell">
+
+  <!-- 工具栏：格式、段落、列表、插入、查找 -->
+  <div class="toolbar" id="toolbar">
+    <div class="tgroup">
+      <button class="tb" data-action="undo" title="撤销 (Ctrl+Z)">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M5.5 3.5 2.5 6.5l3 3"/><path d="M2.5 6.5h6.2a4.3 4.3 0 0 1 0 8.6H6"/></svg>
+      </button>
+      <button class="tb" data-action="redo" title="重做 (Ctrl+Y)">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M10.5 3.5l3 3-3 3"/><path d="M13.5 6.5H7.3a4.3 4.3 0 0 0 0 8.6H10"/></svg>
+      </button>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <select class="select" id="blockFormat" data-keep-selection title="段落格式">
+        <option value="p">正文</option>
+        <option value="h1">标题 1</option>
+        <option value="h2">标题 2</option>
+        <option value="h3">标题 3</option>
+        <option value="blockquote">引用</option>
+        <option value="pre">代码块</option>
+      </select>
+      <select class="select" id="fontFamily" data-keep-selection title="字体" style="width:112px">
+        <option value="'Microsoft YaHei UI','Microsoft YaHei',sans-serif">微软雅黑</option>
+        <option value="SimSun,'Songti SC',serif">宋体</option>
+        <option value="SimHei,'Heiti SC',sans-serif">黑体</option>
+        <option value="KaiTi,'Kaiti SC',serif">楷体</option>
+        <option value="FangSong,'Fangsong SC',serif">仿宋</option>
+        <option value="Arial,Helvetica,sans-serif">Arial</option>
+        <option value="Calibri,sans-serif">Calibri</option>
+        <option value="'Times New Roman',Times,serif">Times New Roman</option>
+        <option value="Verdana,Geneva,sans-serif">Verdana</option>
+        <option value="Georgia,serif">Georgia</option>
+        <option value="'Courier New',monospace">Courier New</option>
+      </select>
+      <select class="select" id="fontSize" data-keep-selection title="字号" style="width:66px">
+        <option value="12">12</option>
+        <option value="13">13</option>
+        <option value="14" selected>14</option>
+        <option value="15">15</option>
+        <option value="16">16</option>
+        <option value="18">18</option>
+        <option value="20">20</option>
+        <option value="24">24</option>
+        <option value="28">28</option>
+        <option value="32">32</option>
+        <option value="36">36</option>
+        <option value="48">48</option>
+      </select>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <button class="tb tb-b" data-cmd="bold" title="加粗 (Ctrl+B)">B</button>
+      <button class="tb tb-i" data-cmd="italic" title="倾斜 (Ctrl+I)">I</button>
+      <button class="tb tb-u" data-cmd="underline" title="下划线 (Ctrl+U)">U</button>
+      <button class="tb tb-s" data-cmd="strikeThrough" title="删除线 (Ctrl+Shift+X)">S</button>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <button class="tb color-btn" id="foreColorBtn" title="字体颜色">
+        <span class="color-glyph">A</span>
+        <span class="color-bar" id="foreColorBar"></span>
+        <input type="color" id="foreColor" value="#131922" aria-label="字体颜色">
+      </button>
+      <button class="tb color-btn" id="backColorBtn" title="背景色">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M4 12.5 10.5 6l2.5 2.5L6.5 15H4z"/><path d="M10 3.5l2.5 2.5"/></svg>
+        <span class="color-bar" id="backColorBar"></span>
+        <input type="color" id="backColor" value="#FFF2A8" aria-label="背景色">
+      </button>
+      <button class="tb tb-text" data-action="clearFormat" title="清除格式">清除格式</button>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <button class="tb" data-cmd="justifyLeft" title="左对齐">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
+      </button>
+      <button class="tb" data-cmd="justifyCenter" title="居中">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M2 4h12M4 8h8M3 12h10"/></svg>
+      </button>
+      <button class="tb" data-cmd="justifyRight" title="右对齐">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M2 4h12M6 8h8M4 12h10"/></svg>
+      </button>
+      <button class="tb" data-cmd="justifyFull" title="两端对齐">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+      </button>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <select class="select" id="lineHeight" data-keep-selection title="行间距" style="width:82px">
+        <option value="">行距</option>
+        <option value="1">1.0</option>
+        <option value="1.2">1.2</option>
+        <option value="1.5">1.5</option>
+        <option value="1.75">1.75</option>
+        <option value="2">2.0</option>
+        <option value="2.5">2.5</option>
+        <option value="3">3.0</option>
+      </select>
+      <select class="select" id="paraSpacing" data-keep-selection title="段间距" style="width:82px">
+        <option value="">段距</option>
+        <option value="0">0</option>
+        <option value="4">4</option>
+        <option value="8">8</option>
+        <option value="12">12</option>
+        <option value="16">16</option>
+        <option value="24">24</option>
+      </select>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <button class="tb" data-cmd="insertUnorderedList" title="无序列表">
+        <svg viewBox="0 0 16 16" class="ic"><circle cx="3" cy="4.5" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="11.5" r="1" fill="currentColor" stroke="none"/><path d="M6 4.5h8M6 8h8M6 11.5h8"/></svg>
+      </button>
+      <button class="tb" data-cmd="insertOrderedList" title="有序列表">
+        <svg viewBox="0 0 16 16" class="ic"><text x="1" y="6" font-size="5.5" fill="currentColor" stroke="none">1</text><text x="1" y="10" font-size="5.5" fill="currentColor" stroke="none">2</text><text x="1" y="14" font-size="5.5" fill="currentColor" stroke="none">3</text><path d="M6 4.5h8M6 8h8M6 11.5h8"/></svg>
+      </button>
+      <button class="tb" data-action="todo" title="待办事项">
+        <svg viewBox="0 0 16 16" class="ic"><rect x="1.5" y="2.5" width="6" height="6" rx="1.2"/><path d="M3 5.6l1.2 1.2L6.5 4"/><path d="M9.5 5.5H14M9.5 12h4.5M2 12.5h5"/></svg>
+      </button>
+      <button class="tb" data-cmd="indent" title="增加缩进 (Tab)">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M6 4h8M6 8h8M6 12h8"/><path d="M2 6l2 2-2 2"/></svg>
+      </button>
+      <button class="tb" data-cmd="outdent" title="减少缩进 (Shift+Tab)">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M6 4h8M6 8h8M6 12h8"/><path d="M4 6l-2 2 2 2"/></svg>
+      </button>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <button class="tb" data-action="table" title="插入表格">
+        <svg viewBox="0 0 16 16" class="ic"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.2"/><path d="M1.8 6.2h12.4M6 6.2v7M10 6.2v7"/></svg>
+      </button>
+      <button class="tb" data-action="image" title="插入图片">
+        <svg viewBox="0 0 16 16" class="ic"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.2"/><circle cx="5.4" cy="5.9" r="1"/><path d="M2.6 11.4l3-3 2 2 2.4-2.4 3 3"/></svg>
+      </button>
+      <button class="tb" data-action="link" title="插入超链接 (Ctrl+K)">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M6.6 9.4a3 3 0 0 0 4.2.2l1.6-1.6a3 3 0 0 0-4.2-4.2L7.1 5"/><path d="M9.4 6.6a3 3 0 0 0-4.2-.2L3.6 8a3 3 0 0 0 4.2 4.2l1.1-1.1"/></svg>
+      </button>
+      <button class="tb" data-action="emoji" title="插入表情">
+        <svg viewBox="0 0 16 16" class="ic"><circle cx="8" cy="8" r="6"/><path d="M5.4 9.4s1 1.5 2.6 1.5 2.6-1.5 2.6-1.5"/><circle cx="6" cy="6.4" r=".8" fill="currentColor" stroke="none"/><circle cx="10" cy="6.4" r=".8" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="tb" data-action="attachment" title="插入附件标识">
+        <svg viewBox="0 0 16 16" class="ic"><path d="M10.2 4.6 5.6 9.2a1.8 1.8 0 0 0 2.5 2.5l4.6-4.6a3 3 0 0 0-4.2-4.2L3.4 8.3a4.1 4.1 0 0 0 5.8 5.8l4-4"/></svg>
+      </button>
+    </div>
+
+    <span class="sep"></span>
+
+    <div class="tgroup">
+      <button class="tb" data-action="find" title="查找替换 (Ctrl+F)">
+        <svg viewBox="0 0 16 16" class="ic"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 14 14"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 查找替换 -->
+  <div class="findbar" id="findBar" hidden>
+    <input type="text" id="findInput" placeholder="查找内容" spellcheck="false">
+    <span class="find-count" id="findCount">0/0</span>
+    <button class="mini" id="findPrev" title="上一个">↑</button>
+    <button class="mini" id="findNext" title="下一个">↓</button>
+    <input type="text" id="replaceInput" placeholder="替换为" spellcheck="false">
+    <button class="mini wide" id="replaceOne">替换</button>
+    <button class="mini wide" id="replaceAll">全部替换</button>
+    <button class="mini" id="findClose" title="关闭">✕</button>
+  </div>
+
+  <!-- 编辑区 -->
+  <div id="editor" contenteditable="true" spellcheck="true" lang="zh-CN"
+       data-placeholder="在此输入邮件正文…"></div>
+
+  <div class="statusbar">
+    <span id="wordCount">0 字</span>
+    <span class="status-dot">富文本</span>
+  </div>
+</div>
+
+<!-- 通用弹层 -->
+<div class="popover" id="linkPop" hidden>
+  <div class="pop-title">插入超链接</div>
+  <label class="pop-row"><span>地址</span><input type="text" id="linkUrl" placeholder="https://" spellcheck="false"></label>
+  <label class="pop-row"><span>文字</span><input type="text" id="linkText" placeholder="留空则使用选中文字" spellcheck="false"></label>
+  <div class="pop-actions">
+    <button class="mini" data-pop-close>取消</button>
+    <button class="mini primary" id="linkOk">插入</button>
+  </div>
+</div>
+
+<div class="popover" id="tablePop" hidden>
+  <div class="pop-title">插入表格</div>
+  <div class="pop-row"><span>行数</span><input type="number" id="tableRows" value="3" min="1" max="20"></div>
+  <div class="pop-row"><span>列数</span><input type="number" id="tableCols" value="3" min="1" max="10"></div>
+  <label class="pop-check"><input type="checkbox" id="tableHeader" checked> 首行为表头</label>
+  <div class="pop-actions">
+    <button class="mini" data-pop-close>取消</button>
+    <button class="mini primary" id="tableOk">插入</button>
+  </div>
+</div>
+
+<div class="popover emoji-pop" id="emojiPop" hidden></div>
+
+<div class="popover" id="attachPop" hidden>
+  <div class="pop-title">插入附件标识</div>
+  <div class="attach-list" id="attachList"></div>
+  <div class="pop-actions">
+    <button class="mini" data-pop-close>关闭</button>
+    <button class="mini primary" id="attachAdd">添加附件…</button>
+  </div>
+</div>
+
+<!-- 右键菜单 -->
+<div class="ctxmenu" id="ctxMenu" hidden>
+  <button data-ctx="undo">撤销</button>
+  <button data-ctx="redo">重做</button>
+  <div class="ctx-sep"></div>
+  <button data-ctx="cut">剪切</button>
+  <button data-ctx="copy">复制</button>
+  <button data-ctx="paste">粘贴</button>
+  <div class="ctx-sep"></div>
+  <button data-ctx="selectAll">全选</button>
+  <button data-ctx="clearFormat">清除格式</button>
+  <div class="ctx-sep" data-table-op hidden></div>
+  <button data-ctx="rowAbove" data-table-op hidden>上方插入行</button>
+  <button data-ctx="rowBelow" data-table-op hidden>下方插入行</button>
+  <button data-ctx="colLeft" data-table-op hidden>左侧插入列</button>
+  <button data-ctx="colRight" data-table-op hidden>右侧插入列</button>
+  <button data-ctx="deleteRow" data-table-op hidden>删除当前行</button>
+  <button data-ctx="deleteCol" data-table-op hidden>删除当前列</button>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="editor.js"></script>
+</body>
+</html>

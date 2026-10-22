@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>ZungMail.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 邮件正文是历史悠久的「脏 HTML」：引用折叠与缩进封顶需要能容错闭合的 DOM 解析 -->
+    <PackageReference Include="AngleSharp" Version="1.8.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZungMail.Update.Protocol\ZungMail.Update.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

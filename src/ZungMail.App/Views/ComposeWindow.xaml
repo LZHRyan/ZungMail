@@ -1,0 +1,584 @@
+<views:DialogWindow x:Class="ZungMail.App.Views.ComposeWindow"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="clr-namespace:ZungMail.App.Views"
+                    xmlns:ct="clr-namespace:ZungMail.App.Controls"
+                    Title="{Binding Title}"
+                    Width="1040"
+                    Height="820"
+                    MinWidth="720"
+                    MinHeight="560"
+                    Background="{DynamicResource WindowBackgroundBrush}"
+                    FontFamily="{StaticResource AppFont}"
+                    FontSize="13">
+
+    <views:DialogWindow.Resources>
+
+        <!-- 收件人补全候选项 -->
+        <DataTemplate x:Key="SuggestionTemplate">
+            <Button Style="{StaticResource SidebarRowButton}"
+                    Height="28"
+                    Command="{Binding DataContext.PickSuggestionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Margin="8,0">
+                    <Border Width="18"
+                            Height="18"
+                            CornerRadius="8"
+                            Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}">
+                        <TextBlock Text="{Binding Initial}"
+                                   Foreground="White"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="{Binding Display}"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Ink2Brush}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <!-- 附件条目：类型徽标 + 文件名 + 大小，与阅读区附件卡片保持同一套视觉 -->
+        <DataTemplate x:Key="AttachmentChipTemplate">
+            <Border Background="{DynamicResource SidebarBrush}"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="7,5"
+                    Margin="0,0,8,6">
+                <StackPanel Orientation="Horizontal">
+                    <ct:AttachmentIcon FileName="{Binding FileName}"
+                                       IconSize="26"
+                                       VerticalAlignment="Center" />
+                    <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding FileName}"
+                                   MaxWidth="190"
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource InkBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Style="{StaticResource MutedText}"
+                                   Text="{Binding SizeDisplay}"
+                                   Margin="0,1,0,0"
+                                   FontSize="11" />
+                    </StackPanel>
+                    <Button Style="{StaticResource IconBtn}"
+                            Width="18"
+                            Height="18"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            Command="{Binding DataContext.RemoveAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"
+                            ToolTip="移除附件">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoClose}" />
+                    </Button>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- 字段标签 -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Width" Value="46" />
+        </Style>
+
+    </views:DialogWindow.Resources>
+
+    <views:DialogWindow.InputBindings>
+        <KeyBinding Key="Enter" Modifiers="Control" Command="{Binding SendCommand}" />
+        <!-- Ctrl+S：立刻存进草稿箱（本地 + 服务器），不关窗，可以接着写 -->
+        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveDraftToBoxCommand}" />
+    </views:DialogWindow.InputBindings>
+
+    <Border BorderBrush="{DynamicResource RuleStrongBrush}" BorderThickness="1">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="46" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏 -->
+            <Border Grid.Row="0"
+                    Grid.ColumnSpan="2"
+                    Background="{DynamicResource ChromeBrush}"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="OnTitleBarMouseDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                        <Border Width="20" Height="20" CornerRadius="6" Background="{DynamicResource BrandMarkBrush}">
+                            <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoCompose}" Stroke="White" />
+                        </Border>
+                        <TextBlock Text="{Binding Title}"
+                                   FontWeight="SemiBold"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource InkBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,4,0">
+                        <!-- 侧栏开关：快速文本 / 地址簿 -->
+                        <ToggleButton Style="{StaticResource ToggleChip}"
+                                      Padding="8,3"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding IsQuickTextPanelVisible, Mode=TwoWay}"
+                                      Checked="OnQuickTextPanelChecked"
+                                      Unchecked="OnQuickTextPanelUnchecked"
+                                      ToolTip="快速文本 / 地址簿（双击追加，不覆盖已写内容）">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoTemplate}" />
+                                <TextBlock Text="快速文本" Margin="5,0,0,0" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <Button Style="{StaticResource WinBtn}"
+                                Margin="2,0,0,0"
+                                Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="最小化">
+                            <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoMin}" />
+                        </Button>
+
+                        <Button Style="{StaticResource WinBtn}"
+                                Command="{x:Static SystemCommands.MaximizeWindowCommand}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="最大化 / 还原">
+                            <Path>
+                                <Path.Style>
+                                    <Style TargetType="Path" BasedOn="{StaticResource IconPathSmall}">
+                                        <Setter Property="Data" Value="{StaticResource IcoMax}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Value="Maximized">
+                                                <Setter Property="Data" Value="{StaticResource IcoRestore}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Path.Style>
+                            </Path>
+                        </Button>
+
+                        <Button Style="{StaticResource WinBtnClose}"
+                                Margin="2,0,0,0"
+                                Command="{x:Static SystemCommands.CloseWindowCommand}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="关闭">
+                            <Path Style="{StaticResource IconPathSmall}"
+                                  Data="{StaticResource IcoClose}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 收件人区 -->
+            <Border Grid.Row="1"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="18,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="发件人" />
+                        <ComboBox Grid.Column="1"
+                                  Style="{StaticResource AppComboBox}"
+                                  ItemsSource="{Binding Accounts}"
+                                  SelectedItem="{Binding SelectedAccount, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="6,0,0,0"
+                                                   Text="{Binding Email, StringFormat=&lt;{0}&gt;}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource BtnGhost}"
+                                Margin="8,0,0,0"
+                                Content="抄送 / 密送"
+                                Command="{Binding ToggleCcBccCommand}" />
+                    </Grid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="收件人" />
+                        <TextBox Grid.Column="1"
+                                 Style="{StaticResource AppTextBox}"
+                                 Text="{Binding To, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
+
+                    <StackPanel Visibility="{Binding ShowCcBcc, Converter={StaticResource BoolToVisibility}}">
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="抄送" />
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource AppTextBox}"
+                                     Text="{Binding Cc, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="密送" />
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource AppTextBox}"
+                                     Text="{Binding Bcc, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- 联系人补全 -->
+                    <ItemsControl Margin="46,6,0,0"
+                                  MaxHeight="150"
+                                  ItemsSource="{Binding Suggestions}"
+                                  ItemTemplate="{StaticResource SuggestionTemplate}"
+                                  Visibility="{Binding HasSuggestions, Converter={StaticResource BoolToVisibility}}" />
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="主题" />
+                        <TextBox Grid.Column="1"
+                                 Style="{StaticResource AppTextBox}"
+                                 Text="{Binding Subject, UpdateSourceTrigger=PropertyChanged}" />
+                        <ComboBox Grid.Column="2"
+                                  Style="{StaticResource AppComboBox}"
+                                  Width="160"
+                                  Margin="8,0,0,0"
+                                  ItemsSource="{Binding Templates}"
+                                  SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                                  ToolTip="邮件模板">
+                            <!-- 用 ItemTemplate 而不是 DisplayMemberPath：自定义 ComboBox 模板的选中框只认 ItemTemplate，
+                                 DisplayMemberPath 会退回 ToString() 显示类型全名 -->
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="3"
+                                Style="{StaticResource BtnGhost}"
+                                Margin="8,0,0,0"
+                                Content="套用"
+                                Command="{Binding ApplyTemplateCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 正文：富文本编辑器（工具栏、查找替换、右键菜单均在编辑器页面内） -->
+            <ct:RichTextEditor x:Name="Editor"
+                               Grid.Row="2"
+                               Html="{Binding BodyHtml, Mode=TwoWay}"
+                               IsDark="{Binding IsDark}"
+                               Signature="{Binding SignatureHtml}"
+                               AttachmentNames="{Binding AttachmentNames}"
+                               FontSize="14" />
+
+            <!-- 附件条 -->
+            <Border Grid.Row="3"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="18,10"
+                    Visibility="{Binding HasAttachments, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding Attachments}" ItemTemplate="{StaticResource AttachmentChipTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Border>
+
+            <!-- 右侧可折叠侧栏：快速文本（双击追加到光标处）/ 地址簿（双击加入收件人） -->
+            <Border Grid.Row="1"
+                    Grid.RowSpan="3"
+                    Grid.Column="1"
+                    Width="276"
+                    Background="{DynamicResource SidebarBrush}"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="1,0,0,0"
+                    Visibility="{Binding IsQuickTextPanelVisible, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Tab 头：分段控件与主界面分段按钮同一套视觉 -->
+                    <Border Grid.Row="0"
+                            Margin="10,10,10,8"
+                            Padding="2"
+                            Background="{DynamicResource WindowBackgroundBrush}"
+                            BorderBrush="{DynamicResource RuleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <UniformGrid Columns="2">
+                            <RadioButton Style="{StaticResource SegmentRadio}"
+                                         Content="快速文本"
+                                         IsChecked="{Binding IsQuickTextTabActive, Mode=TwoWay}"
+                                         Command="{Binding ShowQuickTextTabCommand}" />
+                            <RadioButton Style="{StaticResource SegmentRadio}"
+                                         Content="地址簿"
+                                         IsChecked="{Binding IsAddressBookTabActive, Mode=TwoWay}"
+                                         Command="{Binding ShowAddressBookTabCommand}" />
+                        </UniformGrid>
+                    </Border>
+
+                    <!-- 快速文本：分类下拉（沿用模板分组） -->
+                    <ComboBox Grid.Row="1"
+                              Margin="10,0,10,8"
+                              Style="{StaticResource AppComboBox}"
+                              ItemsSource="{Binding QuickTextCategories}"
+                              SelectedItem="{Binding SelectedQuickTextCategory, Mode=TwoWay}"
+                              ToolTip="按分组筛选快速文本"
+                              Visibility="{Binding IsQuickTextTabActive, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- 地址簿：联系人筛选 -->
+                    <TextBox Grid.Row="1"
+                             Margin="10,0,10,8"
+                             Style="{StaticResource AppTextBox}"
+                             Text="{Binding ContactFilter, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="输入姓名或邮箱筛选联系人"
+                             Visibility="{Binding IsAddressBookTabActive, Converter={StaticResource BoolToVisibility}}" />
+
+                    <Grid Grid.Row="2">
+                        <!-- 快速文本卡片列表 -->
+                        <Grid Visibility="{Binding IsQuickTextTabActive, Converter={StaticResource BoolToVisibility}}">
+                            <ListBox Style="{StaticResource AppListBox}"
+                                     ItemContainerStyle="{StaticResource PanelListItem}"
+                                     ItemsSource="{Binding QuickTexts}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseDoubleClick="OnQuickTextDoubleClick">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel ToolTip="{Binding Body}">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource InkBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Body}"
+                                                       Margin="0,3,0,0"
+                                                       FontSize="12"
+                                                       LineHeight="16"
+                                                       MaxHeight="32"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource Ink2Brush}" />
+                                            <TextBlock Text="{Binding Category}"
+                                                       Margin="0,5,0,0"
+                                                       FontSize="10.5"
+                                                       Foreground="{DynamicResource MutedBrush}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       Margin="16,24,16,0"
+                                       VerticalAlignment="Top"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       LineHeight="18"
+                                       Text="这个分组还没有快速文本。&#x0a;点击下方齿轮，在「设置 → 模板」中新建并勾选「作为快速文本」。"
+                                       Visibility="{Binding IsQuickTextListEmpty, Converter={StaticResource BoolToVisibility}}" />
+                        </Grid>
+
+                        <!-- 地址簿列表 -->
+                        <Grid Visibility="{Binding IsAddressBookTabActive, Converter={StaticResource BoolToVisibility}}">
+                            <ListBox Style="{StaticResource AppListBox}"
+                                     ItemContainerStyle="{StaticResource PanelListItem}"
+                                     ItemsSource="{Binding Contacts}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseDoubleClick="OnContactDoubleClick">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ToolTip="{Binding Display}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.Column="0"
+                                                    Width="20"
+                                                    Height="20"
+                                                    CornerRadius="9"
+                                                    Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Initial}"
+                                                           Foreground="White"
+                                                           FontSize="10"
+                                                           FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="9,0,0,0"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource InkBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding Display}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       Margin="16,24,16,0"
+                                       VerticalAlignment="Top"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Text="没有匹配的联系人。"
+                                       Visibility="{Binding IsContactListEmpty, Converter={StaticResource BoolToVisibility}}" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- 底部：计数 + 管理入口 -->
+                    <Border Grid.Row="3"
+                            BorderBrush="{DynamicResource RuleBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="10,6">
+                        <Grid>
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Text="双击卡片追加到光标处"
+                                       Visibility="{Binding IsQuickTextTabActive, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Text="双击联系人加入收件人"
+                                       Visibility="{Binding IsAddressBookTabActive, Converter={StaticResource BoolToVisibility}}" />
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,6,0"
+                                           Text="{Binding QuickTextSummary}"
+                                           Visibility="{Binding IsQuickTextTabActive, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,6,0"
+                                           Text="{Binding ContactSummary}"
+                                           Visibility="{Binding IsAddressBookTabActive, Converter={StaticResource BoolToVisibility}}" />
+                                <Button Style="{StaticResource IconBtn}"
+                                        Width="24"
+                                        Height="24"
+                                        Command="{Binding ManageQuickTextsCommand}"
+                                        ToolTip="管理快速文本（设置 → 模板）">
+                                    <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoGear}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- 底部操作栏 -->
+            <Border Grid.Row="4"
+                    Grid.ColumnSpan="2"
+                    Background="{DynamicResource ChromeBrush}"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ToggleButton Style="{StaticResource ToggleChip}"
+                                      IsChecked="{Binding ScheduleEnabled}"
+                                      ToolTip="定时发送（FR-08）">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoClock}" />
+                                <TextBlock Text="定时发送" Margin="6,0,0,0" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="10,0,0,0"
+                                    Visibility="{Binding ScheduleEnabled, Converter={StaticResource BoolToVisibility}}">
+                            <DatePicker Width="132"
+                                        VerticalAlignment="Center"
+                                        SelectedDate="{Binding ScheduleDate, Mode=TwoWay}" />
+                            <TextBox Style="{StaticResource AppTextBox}"
+                                     Width="70"
+                                     Margin="8,0,0,0"
+                                     Text="{Binding ScheduleTime, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+                            <Button Style="{StaticResource BtnGhost}" Content="延迟 1 分钟"
+                                    Command="{Binding DelayOneMinuteCommand}" ToolTip="1 分钟后自动发送" />
+                            <Button Style="{StaticResource BtnGhost}" Margin="6,0,0,0" Content="延迟 30 分钟"
+                                    Command="{Binding DelayThirtyMinutesCommand}" ToolTip="30 分钟后自动发送" />
+                            <Button Style="{StaticResource BtnGhost}" Margin="6,0,0,0" Content="明早 9 点"
+                                    Command="{Binding DelayTomorrowMorningCommand}" ToolTip="明天 09:00 自动发送" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               Style="{StaticResource MutedText}"
+                               Margin="14,0"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               Text="{Binding StatusText}" />
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Style="{StaticResource Btn}"
+                                Content="保存草稿"
+                                ToolTip="保存到草稿箱（Ctrl+S），不关闭窗口"
+                                Command="{Binding SaveDraftToBoxCommand}" />
+                        <Button Style="{StaticResource Btn}"
+                                Margin="8,0,0,0"
+                                Content="取消"
+                                Command="{Binding CancelCommand}" />
+                        <Button Style="{StaticResource BtnPrimary}"
+                                Margin="8,0,0,0"
+                                MinWidth="88"
+                                Content="发送"
+                                Click="OnSendClick"
+                                IsEnabled="{Binding IsSending, Converter={StaticResource InverseBool}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</views:DialogWindow>

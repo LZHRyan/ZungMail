@@ -1,0 +1,2805 @@
+<views:DialogWindow x:Class="ZungMail.App.Views.SettingsWindow"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="clr-namespace:ZungMail.App.Views"
+                    xmlns:controls="clr-namespace:ZungMail.App.Controls"
+                    Title="设置"
+                    ResizeMode="CanResize"
+                    WindowState="Normal"
+                    Width="1160"
+                    Height="820"
+                    MinWidth="940"
+                    MinHeight="600"
+                    Background="{DynamicResource WindowBackgroundBrush}"
+                    FontFamily="{StaticResource AppFont}"
+                    FontSize="13">
+
+    <views:DialogWindow.Resources>
+
+        <DataTemplate x:Key="SectionTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Path Style="{StaticResource IconPathSmall}"
+                      Data="{Binding IconKey, Converter={StaticResource ResourceKey}}" />
+                <TextBlock Text="{Binding Title}" Margin="9,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- 账户卡片：一眼看清账号、收发服务器、登录方式、本地邮件量、运行状态与签名状态 -->
+        <Style x:Key="AccountChip" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SidebarBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource RuleBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+
+        <Style x:Key="AccountChipText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink2Brush}" />
+        </Style>
+
+        <Style x:Key="AccountChipWarning" TargetType="Border" BasedOn="{StaticResource AccountChip}">
+            <Setter Property="Background" Value="{DynamicResource WarningSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}" />
+        </Style>
+
+        <DataTemplate x:Key="AccountRowTemplate">
+            <Border Margin="2,4"
+                    Padding="13,11"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="1"
+                    Background="Transparent">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 头像 + 启用状态小圆点 -->
+                    <Grid Grid.Column="0" Width="46" Height="46" VerticalAlignment="Top">
+                        <Border CornerRadius="23"
+                                Background="{Binding Color, Converter={StaticResource HexToBrush}}">
+                            <TextBlock Text="{Binding Initials}"
+                                       Foreground="White"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <Ellipse x:Name="StatusDot"
+                                 Width="11"
+                                 Height="11"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Bottom"
+                                 Margin="0,0,1,1"
+                                 Fill="{DynamicResource OkDotBrush}"
+                                 Stroke="{DynamicResource WindowBackgroundBrush}"
+                                 StrokeThickness="2"
+                                 ToolTip="账户启用状态" />
+                    </Grid>
+
+                    <!-- 主体信息 -->
+                    <StackPanel Grid.Column="1" Margin="12,0,14,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Name}"
+                                       FontSize="14.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource InkBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       FontSize="11"
+                                       Margin="9,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding SenderDisplayText}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding HasSenderDisplay, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource MutedText}"
+                                   FontSize="12"
+                                   Margin="0,3,0,0"
+                                   Text="{Binding Email}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding ShowEmailLine, Converter={StaticResource BoolToVisibility}}" />
+
+                        <WrapPanel Margin="0,7,0,0">
+                            <!-- 主账户徽标：同步与列表都优先它 -->
+                            <Border Style="{StaticResource AccountChip}"
+                                    Visibility="{Binding IsPrimary, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource AccountChipText}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           Text="主账户" />
+                            </Border>
+                            <Border Style="{StaticResource AccountChip}">
+                                <TextBlock Style="{StaticResource AccountChipText}" Text="{Binding ImapText}" />
+                            </Border>
+                            <Border Style="{StaticResource AccountChip}">
+                                <TextBlock Style="{StaticResource AccountChipText}" Text="{Binding SmtpText}" />
+                            </Border>
+                            <Border Style="{StaticResource AccountChip}">
+                                <TextBlock Style="{StaticResource AccountChipText}" Text="{Binding AuthText}" />
+                            </Border>
+                            <Border Style="{StaticResource AccountChip}"
+                                    Visibility="{Binding HasCustomUsername, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource AccountChipText}" Text="{Binding UsernameText}" />
+                            </Border>
+                            <Border Style="{StaticResource AccountChipWarning}"
+                                    Visibility="{Binding HasInsecureTransport, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource AccountChipText}"
+                                           Foreground="{DynamicResource WarningBrush}"
+                                           Text="存在未加密连接" />
+                            </Border>
+                        </WrapPanel>
+
+                        <TextBlock Style="{StaticResource MutedText}"
+                                   FontSize="11.5"
+                                   Margin="0,7,0,0"
+                                   Text="{Binding LocalStatsText}" />
+                    </StackPanel>
+
+                    <!-- 右侧状态与签名 -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right">
+                        <Border x:Name="StatusBadge"
+                                Padding="7,2"
+                                CornerRadius="9"
+                                Background="{DynamicResource AccentSoftBrush}">
+                            <TextBlock x:Name="StatusTextBlock"
+                                       Text="{Binding StatusText}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource AccentBrush}" />
+                        </Border>
+                        <Border x:Name="SignatureBadge"
+                                Margin="0,6,0,0"
+                                Padding="7,2"
+                                CornerRadius="9"
+                                HorizontalAlignment="Right"
+                                Background="{DynamicResource AccentSoftBrush}">
+                            <TextBlock x:Name="SignatureTextBlock"
+                                       Text="{Binding SignatureText}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource AccentBrush}" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <!-- 先判配置完整性，再判停用：停用优先展示 -->
+                <DataTrigger Binding="{Binding HasCompleteConfig}" Value="False">
+                    <Setter TargetName="StatusBadge" Property="Background" Value="{DynamicResource WarningSoftBrush}" />
+                    <Setter TargetName="StatusTextBlock" Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                    <Setter TargetName="StatusBadge" Property="Background" Value="{DynamicResource BadgeGrayBackgroundBrush}" />
+                    <Setter TargetName="StatusTextBlock" Property="Foreground" Value="{DynamicResource MutedBrush}" />
+                    <Setter TargetName="StatusDot" Property="Fill" Value="{DynamicResource MutedBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding SignatureEnabled}" Value="False">
+                    <Setter TargetName="SignatureBadge" Property="Background" Value="{DynamicResource BadgeGrayBackgroundBrush}" />
+                    <Setter TargetName="SignatureTextBlock" Property="Foreground" Value="{DynamicResource MutedBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- 模板列表条目：缩略预览 + 名称 / 主题 / 分组 / 状态标记 -->
+        <DataTemplate x:Key="TemplateRowTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 缩略预览图：取正文前三行文本按极小字号排布，形成「一页纸」的轮廓 -->
+                <Border Grid.Column="0"
+                        Width="58"
+                        Height="48"
+                        CornerRadius="4"
+                        Background="{DynamicResource ReaderBrush}"
+                        BorderBrush="{DynamicResource RuleStrongBrush}"
+                        BorderThickness="1"
+                        VerticalAlignment="Top">
+                    <Grid Margin="6,5,6,5">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Rectangle Grid.Row="0"
+                                   Height="3"
+                                   RadiusX="1.5"
+                                   RadiusY="1.5"
+                                   Fill="{DynamicResource AccentBrush}"
+                                   Opacity="0.7" />
+
+                        <TextBlock Grid.Row="1"
+                                   Margin="0,3,0,0"
+                                   FontSize="6"
+                                   Foreground="{DynamicResource Ink2Brush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding ThumbnailLine1}" />
+                        <TextBlock Grid.Row="2"
+                                   Margin="0,2,0,0"
+                                   FontSize="6"
+                                   Foreground="{DynamicResource MutedBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding ThumbnailLine2}" />
+                        <TextBlock Grid.Row="3"
+                                   Margin="0,2,0,0"
+                                   FontSize="6"
+                                   Foreground="{DynamicResource MutedBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding ThumbnailLine3}" />
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding Name}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource InkBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <Ellipse Grid.Column="1"
+                                 Width="6"
+                                 Height="6"
+                                 Margin="6,0,0,0"
+                                 VerticalAlignment="Center"
+                                 Fill="{DynamicResource WarnDotBrush}"
+                                 ToolTip="有未保存的修改"
+                                 Visibility="{Binding IsDirty, Converter={StaticResource BoolToVisibility}}" />
+
+                        <Border Grid.Column="2"
+                                Margin="6,0,0,0"
+                                Padding="5,1"
+                                CornerRadius="3"
+                                Background="{DynamicResource AccentSoftBrush}"
+                                Visibility="{Binding IsBuiltIn, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="内置"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource AccentBrush}" />
+                        </Border>
+                    </Grid>
+
+                    <TextBlock Style="{StaticResource MutedText}"
+                               Margin="0,3,0,0"
+                               Text="{Binding SubjectDisplay}" />
+                    <TextBlock Style="{StaticResource MutedText}"
+                               FontSize="11"
+                               Margin="0,2,0,0"
+                               Text="{Binding CategoryDisplay}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="CardTitle" TargetType="TextBlock" BasedOn="{StaticResource PageTitle}">
+            <Setter Property="FontSize" Value="13.5" />
+        </Style>
+
+        <Style x:Key="RowCheckBox" TargetType="CheckBox" BasedOn="{StaticResource AppCheckBox}">
+            <Setter Property="Margin" Value="0,7,0,0" />
+        </Style>
+
+        <!-- 升级地址说明：写错时标红，未配置保持普通灰字 -->
+        <Style x:Key="UpdateAddressHint" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding UpdateAddressIsError}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource CriticalBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 反馈结果条：成功为常规灰字，失败/拒绝时用告警色 -->
+        <Style x:Key="FeedbackResult" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding FeedbackResultIsError}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource CriticalBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PanelLabel" TargetType="TextBlock" BasedOn="{StaticResource LabelText}">
+            <Setter Property="Margin" Value="0,0,0,5" />
+        </Style>
+
+    </views:DialogWindow.Resources>
+
+    <Border BorderBrush="{DynamicResource RuleStrongBrush}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="46" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏 -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource ChromeBrush}"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="OnTitleBarMouseDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                        <Border Width="20" Height="20" CornerRadius="6" Background="{DynamicResource BrandMarkBrush}">
+                            <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoGear}" Stroke="White" />
+                        </Border>
+                        <TextBlock Text="设置"
+                                   FontWeight="SemiBold"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource InkBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource WinBtn}"
+                                Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="最小化">
+                            <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoMin}" />
+                        </Button>
+                        <Button Style="{StaticResource WinBtn}"
+                                Command="{x:Static SystemCommands.MaximizeWindowCommand}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="最大化 / 还原">
+                            <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoMax}" />
+                        </Button>
+                        <Button Style="{StaticResource WinBtnClose}"
+                                Command="{x:Static SystemCommands.CloseWindowCommand}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                ToolTip="关闭">
+                            <Path Style="{StaticResource IconPathSmall}"
+                                  Data="{StaticResource IcoClose}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 主体：左侧导航 + 右侧内容 -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="176" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Background="{DynamicResource SidebarBrush}"
+                        BorderBrush="{DynamicResource RuleBrush}"
+                        BorderThickness="0,0,1,0">
+                    <ListBox Style="{StaticResource AppListBox}"
+                             Margin="0,10,0,10"
+                             ItemContainerStyle="{StaticResource PanelListItem}"
+                             ItemTemplate="{StaticResource SectionTemplate}"
+                             ItemsSource="{Binding Sections}"
+                             SelectedItem="{Binding SelectedSection, Mode=TwoWay}" />
+                </Border>
+
+                <!-- ============ 通用 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsGeneralSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="外观" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="主题色" />
+                                    <Border Background="{DynamicResource SidebarBrush}"
+                                            BorderBrush="{DynamicResource RuleStrongBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="2">
+                                        <WrapPanel Orientation="Horizontal">
+                                            <RadioButton Style="{StaticResource SegmentRadio}"
+                                                         GroupName="ThemePick"
+                                                         ToolTip="中性灰底 + 系统蓝（默认）"
+                                                         IsChecked="{Binding IsDefaultTheme, Mode=TwoWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                            Background="#005FB8" />
+                                                    <TextBlock Text="默认" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton Style="{StaticResource SegmentRadio}"
+                                                         GroupName="ThemePick"
+                                                         ToolTip="冷调浅蓝底 + 蓝色主色"
+                                                         IsChecked="{Binding IsBlueTheme, Mode=TwoWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                            Background="#2C6FD1" />
+                                                    <TextBlock Text="淡蓝" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton Style="{StaticResource SegmentRadio}"
+                                                         GroupName="ThemePick"
+                                                         ToolTip="暖调浅粉底 + 玫红主色"
+                                                         IsChecked="{Binding IsPinkTheme, Mode=TwoWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                            Background="#C24E7D" />
+                                                    <TextBlock Text="淡粉" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton Style="{StaticResource SegmentRadio}"
+                                                         GroupName="ThemePick"
+                                                         ToolTip="暖黄浅底 + 焦糖橙主色"
+                                                         IsChecked="{Binding IsOrangeTheme, Mode=TwoWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                                                            Background="#B4681F" />
+                                                    <TextBlock Text="淡橙" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                        </WrapPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}" Margin="86,6,0,0" TextWrapping="Wrap"
+                                           Text="选中即时预览，点右下角「保存设置」后长期生效。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="字号" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="150"
+                                              ItemsSource="{Binding FontSizeOptions}"
+                                              SelectedIndex="{Binding FontSizeIndex, Mode=TwoWay}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="同步" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="启动时自动增量同步"
+                                          IsChecked="{Binding Settings.SyncOnLaunch}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="默认收取策略" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="220"
+                                              ToolTip="同步时只自动下载窗口内的邮件正文与附件；更早的邮件仅同步邮件头，选中该邮件时才向服务器下载完整正文与附件。垃圾箱与垃圾邮件不预取。"
+                                              ItemsSource="{Binding BodyPrefetchOptions}"
+                                              SelectedIndex="{Binding BodyPrefetchIndex, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="这是账户没有单独设置时的默认策略：窗口外的历史邮件只保留邮件头（主题 / 收发件人 / 时间 / 附件名），正文与附件在阅读时按需下载。单个账户可以在「账户 → 收取设置」里覆盖它。" />
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="退出时清除正文缓存"
+                                          IsChecked="{Binding Settings.ClearBodyCacheOnExit}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="同步间隔" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="80"
+                                             Text="{Binding Settings.SyncIntervalMinutes, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="分钟" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="回收站保留" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="80"
+                                             Text="{Binding Settings.KeepTrashDays, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="天" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="阅读与列表" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="默认按会话聚合邮件（FR-05）"
+                                          IsChecked="{Binding Settings.ConversationDefault}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="开机后自动启动 ZungMail"
+                                          ToolTip="仅写入当前 Windows 用户的启动项，不影响其它账户"
+                                          IsChecked="{Binding Settings.LaunchOnStartup}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="关闭主窗口时最小化到托盘"
+                                          IsChecked="{Binding Settings.CloseToTray}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="新邮件桌面通知"
+                                          IsChecked="{Binding Settings.DesktopNotify}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="标记陌生发件人（首次来信用警告色提示）"
+                                          ToolTip="收信时判定：通讯录里没有、也从来没有来过信的发件人，在列表与阅读区打警告色「陌生」标记。关闭后不再显示，判定数据仍保留在本地库。"
+                                          IsChecked="{Binding Settings.MarkStrangerSenders}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="检测仿冒域名（钓鱼警示）"
+                                          ToolTip="发件人域名与你自己账户的企业域名高度相似时（差一个字符、0/1 混淆、换后缀、夹在你的域名里），在列表与阅读区打红色「疑似钓鱼」警示。公共邮箱域名（qq / 163 / gmail 等）不参与比较。"
+                                          IsChecked="{Binding Settings.PhishingDomainWarning}" />
+                                <StackPanel Orientation="Horizontal" Margin="24,6,0,0" IsEnabled="{Binding Settings.PhishingDomainWarning}">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="相似度容差" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="200"
+                                              ToolTip="「差 1 个字符」是默认值；放宽到 2 个字符更容易命中，也更容易把正常的相似域名误标红。"
+                                              ItemsSource="{Binding PhishingToleranceOptions}"
+                                              SelectedIndex="{Binding PhishingToleranceIndex, Mode=TwoWay}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="10,0,0,0"
+                                               VerticalAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Text="放宽后更容易误报" />
+                                </StackPanel>
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="使用 HTML 渲染邮件正文（WebView2）"
+                                          IsChecked="{Binding Settings.HtmlRendering}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="附件使用内置预览（PDF / 图片 / 文本）"
+                                          ToolTip="关闭后单击附件将直接调用系统默认程序"
+                                          IsChecked="{Binding Settings.UseInternalAttachmentPreview}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="默认阻止远程图片（防追踪像素）"
+                                          IsChecked="{Binding Settings.BlockRemoteImages}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="空闲时加载联系人头像（Gravatar）"
+                                          ToolTip="启动约 20 秒后查一次最近往来的 300 个地址，命中就把首字母色块换成真实头像；一个运行周期只尝试一次"
+                                          IsChecked="{Binding Settings.LoadContactAvatars}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="24,2,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="IMAP 服务器没有取头像与通讯录的接口，只能用邮箱地址到 Gravatar 查公开头像：查不到就保持首字母色块，关闭后完全不发这类请求。查询会把邮箱地址的 MD5 发给 gravatar.com。" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="默认折叠超长邮件的历史引用"
+                                          ToolTip="开启后，多层引用的长线程会把更早的历史收成一条「显示更早的历史邮件（N 层）」，点一下展开；关闭则直接展开显示"
+                                          IsChecked="{Binding FoldQuotedHistoryEnabled}" />
+                                <StackPanel Orientation="Horizontal" Margin="24,8,0,0" IsEnabled="{Binding FoldQuotedHistoryKeepEnabled}">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="保留最近" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="180"
+                                              ToolTip="折叠时保留最近几层引用直接显示，只收起更早的；引用层数不超过这个值时整篇保持展开"
+                                              ItemsSource="{Binding FoldKeepLayerOptions}"
+                                              SelectedIndex="{Binding FoldKeepLayerIndex, Mode=TwoWay}" />
+                                </StackPanel>
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="自动发送阅读收条（对请求回执的邮件）"
+                                          ToolTip="默认关闭；开启后打开邮件即自动回复回执，请确认已理解隐私影响"
+                                          IsChecked="{Binding Settings.AutoSendReadReceipt}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="分页大小" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="140"
+                                              ToolTip="邮件列表每次加载的封数。越大滚动越顺，但每次切换文件夹/筛选的首屏等待也越久。"
+                                              ItemsSource="{Binding ListPageSizeOptions}"
+                                              SelectedIndex="{Binding ListPageSizeIndex, Mode=TwoWay}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="（列表始终分页加载，不会一次性读取全部邮件）" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="安全" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="启用客户端锁定后，锁定状态需输入密码才能查看邮件；程序启动时默认不锁定，空闲达到设定时长会自动锁定。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource LabelText}"
+                                               VerticalAlignment="Center"
+                                               Text="锁定密码" />
+                                    <PasswordBox x:Name="ClientLockPasswordBox"
+                                                 Width="220"
+                                                 Margin="12,0,0,0"
+                                                 Style="{StaticResource AppPasswordBox}" />
+                                    <Button Margin="10,0,0,0"
+                                            Style="{StaticResource BtnPrimary}"
+                                            Content="设置 / 修改"
+                                            Click="OnSetLockPasswordClick" />
+                                    <Button Margin="8,0,0,0"
+                                            Style="{StaticResource Btn}"
+                                            Content="关闭锁定"
+                                            Click="OnDisableLockClick" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource LabelText}"
+                                               VerticalAlignment="Center"
+                                               Text="空闲自动锁定" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="150"
+                                              Margin="12,0,0,0"
+                                              ItemsSource="{Binding AutoLockOptions}"
+                                              SelectedIndex="{Binding AutoLockIndex, Mode=TwoWay}" />
+                                    <Button Margin="10,0,0,0"
+                                            Style="{StaticResource Btn}"
+                                            Content="立即锁定"
+                                            Command="{Binding LockClientNowCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           Text="{Binding ClientLockStatusText}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="全局热键" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="注册系统级热键：主界面在前台时隐藏到托盘，否则从任意程序切回主界面。需至少一个修饰键，支持 A-Z、0-9 与 F1-F24。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <CheckBox Style="{StaticResource RowCheckBox}"
+                                              VerticalAlignment="Center"
+                                              Content="启用全局热键"
+                                              IsChecked="{Binding GlobalHotkeyEnabled}" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="180"
+                                             Margin="16,0,0,0"
+                                             Text="{Binding GlobalHotkeyText, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="10,0,0,0"
+                                            Content="保存热键"
+                                            Command="{Binding SaveGlobalHotkeyCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           Text="{Binding GlobalHotkeyStatus}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="诊断与日志" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="运行日志写在数据目录的 logs 下（按天一个 app-日期.log 文件），用于定位同步、发信与升级问题。日志只保留最近 7 天，超期的会在程序运行期间自动删除。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="日志保留" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="150"
+                                              ToolTip="最多 7 天；启动后与每小时检查一次，超期的 app-日期.log 自动删除，只影响日志目录"
+                                              ItemsSource="{Binding LogRetentionOptions}"
+                                              SelectedIndex="{Binding LogRetentionIndex, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding LogRetentionHint}" />
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding LogUsageText}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button Style="{StaticResource Btn}"
+                                            Content="立即清理超期日志"
+                                            Command="{Binding CleanLogsCommand}"
+                                            ToolTip="按上面的保留天数删掉超期文件；未超期的日志不会被删除" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ 账户 ============ -->
+                <Grid Grid.Column="1"
+                      Margin="20,18,20,18"
+                      Visibility="{Binding IsAccountsSection, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 邮箱账户卡片：标题行与账户列表同处一张带边界的卡片 -->
+                    <Border Grid.Row="0" Style="{StaticResource CardPanel}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0"
+                                    Padding="14,9,14,8"
+                                    BorderBrush="{DynamicResource RuleBrush}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <TextBlock Style="{StaticResource PanelLabel}" Text="邮箱账户（FR-01）" Margin="0" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding AccountListSummary}" />
+                                </Grid>
+                            </Border>
+
+                            <Grid Grid.Row="1">
+                                <ListBox Margin="0,6,0,6"
+                                         Style="{StaticResource AppListBox}"
+                                         ItemTemplate="{StaticResource AccountRowTemplate}"
+                                         ItemsSource="{Binding AccountCards}"
+                                         SelectedItem="{Binding SelectedAccountCard, Mode=TwoWay}">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource CardListItem}">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="6,0,6,0" />
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                </ListBox>
+
+                                <!-- 空状态：没有账户时给出下一步动作，而不是一片空白 -->
+                                <Border Margin="12"
+                                        Background="{DynamicResource ReaderBrush}"
+                                        BorderBrush="{DynamicResource RuleBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="24"
+                                        Visibility="{Binding HasNoAccounts, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border Width="46" Height="46" CornerRadius="23" Background="{DynamicResource AccentSoftBrush}">
+                                            <Path Style="{StaticResource IconPathSmall}"
+                                                  Data="{StaticResource IcoUsers}"
+                                                  Stroke="{DynamicResource AccentBrush}" />
+                                        </Border>
+                                        <TextBlock Margin="0,12,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource InkBrush}"
+                                                   Text="还没有邮箱账户" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="0,6,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   Text="点下方「添加账户」填写邮箱地址与授权码，客户端会自动匹配常用服务商配置。" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource BtnPrimary}"
+                                    Content="添加账户"
+                                    Command="{Binding AddAccountCommand}" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="编辑"
+                                    Command="{Binding EditAccountCommand}"
+                                    IsEnabled="{Binding HasSelectedAccount}" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="删除"
+                                    Command="{Binding DeleteAccountCommand}"
+                                    IsEnabled="{Binding HasSelectedAccount}" />
+                        </StackPanel>
+
+                        <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Style="{StaticResource Btn}"
+                                    Content="设为主账户"
+                                    Command="{Binding SetPrimaryAccountCommand}"
+                                    IsEnabled="{Binding CanSetPrimaryAccount}"
+                                    ToolTip="主账户在一轮同步里最先刷新，侧栏与账户列表也排在最前；其余账户自动作为副账户" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="立即同步"
+                                    Command="{Binding SyncAccountCommand}"
+                                    IsEnabled="{Binding CanRunAccountAction}" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="启用 / 停用"
+                                    Command="{Binding ToggleAccountEnabledCommand}"
+                                    IsEnabled="{Binding HasSelectedAccount}"
+                                    ToolTip="停止使用后不再收信与自动发送，本地邮件保留" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="修复乱码"
+                                    Command="{Binding RepairEncodingCommand}"
+                                    IsEnabled="{Binding CanRunAccountAction}"
+                                    ToolTip="清空该账户本地邮件并重新拉取邮件头，用于修正 GBK / KOI8-R / Windows-1251 等旧字符集乱码" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="收发诊断"
+                                    Command="{Binding RunDiagnosticsCommand}"
+                                    IsEnabled="{Binding CanRunAccountAction}"
+                                    ToolTip="按 DNS → TCP → 登录 → 文件夹 → SMTP 顺序检查，并复制诊断报告" />
+                        </WrapPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- ============ 签名 ============ -->
+                <!-- 富文本签名控件是 WebView2，同样不能放进 ScrollViewer，按行分配高度 -->
+                <Grid Grid.Column="1"
+                      Margin="20,16,20,16"
+                      Visibility="{Binding IsSignatureSection, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="248" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 左：按账户列出，右侧编辑选中账户的签名 -->
+                    <Grid Grid.Column="0" Margin="0,0,14,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 邮箱账户卡片：标题行与账户列表同处一张带边界的圆角卡片 -->
+                        <Border Grid.Row="0" Style="{StaticResource CardPanel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <Border Grid.Row="0"
+                                        Padding="12,8,12,7"
+                                        BorderBrush="{DynamicResource RuleBrush}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <TextBlock Style="{StaticResource PanelLabel}" Text="邮箱账户" Margin="0" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding SignatureAccountCountText}" />
+                                    </Grid>
+                                </Border>
+
+                                <ListBox Grid.Row="1"
+                                         Margin="0,6,0,6"
+                                         Style="{StaticResource AppListBox}"
+                                         ItemContainerStyle="{StaticResource CardListItem}"
+                                         ItemsSource="{Binding SignatureAccounts}"
+                                         SelectedItem="{Binding SelectedSignatureAccount, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Grid.Column="0"
+                                                        Width="24"
+                                                        Height="24"
+                                                        CornerRadius="12"
+                                                        Background="{Binding Color, Converter={StaticResource HexToBrush}}"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Initials}"
+                                                               Foreground="White"
+                                                               FontSize="10"
+                                                               FontWeight="SemiBold"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Margin="9,0,6,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource InkBrush}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Style="{StaticResource MutedText}"
+                                                               FontSize="11"
+                                                               Text="{Binding Email}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+
+                                                <Border Grid.Column="2"
+                                                        Padding="6,1"
+                                                        CornerRadius="6"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource BadgeGrayBackgroundBrush}">
+                                                    <TextBlock Text="{Binding StateText}"
+                                                               FontSize="10.5"
+                                                               Foreground="{DynamicResource MutedBrush}" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Grid.Row="1" Margin="0,10,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource Btn}"
+                                        Content="导出…"
+                                        Command="{Binding ExportSignaturesCommand}"
+                                        ToolTip="把所有账户的签名导出成 JSON，可在另一台机器或同事那里导入" />
+                                <Button Style="{StaticResource Btn}"
+                                        Margin="8,0,0,0"
+                                        Content="导入…"
+                                        Command="{Binding ImportSignaturesCommand}"
+                                        ToolTip="从签名文件导入；按邮箱地址匹配账户，命中的会覆盖现有签名" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       FontSize="11.5"
+                                       Text="每个账户一份签名；关闭「使用签名」后该账户发出的邮件不带签名。导出导入按邮箱地址匹配账户。" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 右：启用开关 + 富文本签名编辑 -->
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <TextBlock Style="{StaticResource PanelLabel}"
+                                       Margin="0"
+                                       VerticalAlignment="Center"
+                                       Text="签名内容" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding SignatureAccountTitle}" />
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" Margin="0,12,0,0">
+                            <CheckBox Style="{StaticResource AppCheckBox}"
+                                      Content="使用签名"
+                                      IsChecked="{Binding SignatureEnabled, Mode=TwoWay}"
+                                      IsEnabled="{Binding HasSelectedSignatureAccount}"
+                                      ToolTip="勾选后，用该账户发送的邮件会在正文末尾自动追加这段签名" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       FontSize="11.5"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding SignatureHint}" />
+                        </StackPanel>
+
+                        <Border Grid.Row="2"
+                                Margin="0,8,0,0"
+                                Background="{DynamicResource WindowBackgroundBrush}"
+                                BorderBrush="{DynamicResource RuleStrongBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding HasSelectedSignatureAccount, Converter={StaticResource BoolToVisibility}}">
+                            <controls:RichTextEditor x:Name="SignatureEditor"
+                                                     Html="{Binding SignatureHtml, Mode=TwoWay}"
+                                                     IsDark="{Binding IsDarkPreview}"
+                                                     Placeholder="在此输入签名…"
+                                                     FontSize="13.5" />
+                        </Border>
+
+                        <TextBlock Grid.Row="2"
+                                   Style="{StaticResource MutedText}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="先在左侧选择一个邮箱账户"
+                                   Visibility="{Binding HasSelectedSignatureAccount, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                        <TextBlock Grid.Row="3"
+                                   Style="{StaticResource MutedText}"
+                                   FontSize="11.5"
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="签名支持加粗、颜色、字号、图片等富文本格式；修改后点窗口右下角「保存设置」生效。同一段签名不会在正文里重复追加。" />
+                    </Grid>
+                </Grid>
+
+                <!-- ============ 模板 ============ -->
+                <!-- 这里不能用 ScrollViewer：正文编辑区是 WebView2（独立 HWND），滚动时不会被 ScrollViewer
+                     视口裁剪，内容一超高就会盖住窗口底部的状态栏和按钮。改为按可视高度分配行高。 -->
+                <Grid Grid.Column="1"
+                      Margin="20,16,20,16"
+                      Visibility="{Binding IsTemplatesSection, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="248" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 左：Tab（邮件模板 / 快速文本）+ 列表 -->
+                    <Grid Grid.Column="0" Margin="0,0,14,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 两类内容分开管理：模板是整封邮件，快速文本是一句话术 -->
+                        <Border Grid.Row="0"
+                                Margin="0,0,0,10"
+                                Padding="2"
+                                Background="{DynamicResource WindowBackgroundBrush}"
+                                BorderBrush="{DynamicResource RuleBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <UniformGrid Columns="2">
+                                <RadioButton Style="{StaticResource SegmentRadio}"
+                                             Content="邮件模板"
+                                             IsChecked="{Binding IsMailTemplateTabActive, Mode=TwoWay}"
+                                             Command="{Binding ShowMailTemplateTabCommand}" />
+                                <RadioButton Style="{StaticResource SegmentRadio}"
+                                             Content="快速文本"
+                                             IsChecked="{Binding IsQuickTextTabActive, Mode=TwoWay}"
+                                             Command="{Binding ShowQuickTextTabCommand}" />
+                            </UniformGrid>
+                        </Border>
+
+                        <Grid Grid.Row="1" Margin="0,0,0,6">
+                            <TextBlock Style="{StaticResource PanelLabel}" Text="{Binding TemplateListTitle}" Margin="0" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding TemplateCountText}" />
+                        </Grid>
+
+                        <ListBox Grid.Row="2"
+                                 Style="{StaticResource AppListBox}"
+                                 ItemContainerStyle="{StaticResource PanelListItem}"
+                                 ItemTemplate="{StaticResource TemplateRowTemplate}"
+                                 ItemsSource="{Binding VisibleTemplates}"
+                                 SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}" />
+
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{StaticResource BtnPrimary}"
+                                    Content="{Binding TemplateNewButtonText}"
+                                    Command="{Binding NewTemplateCommand}" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="复制"
+                                    Command="{Binding DuplicateTemplateCommand}"
+                                    IsEnabled="{Binding HasSelectedTemplate}" />
+                        </StackPanel>
+
+                        <!-- 分享给同事：导出为 JSON 文件，对方在同一个入口导入 -->
+                        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Style="{StaticResource Btn}"
+                                    Content="导入…"
+                                    Command="{Binding ImportTemplatesCommand}"
+                                    ToolTip="从同事分享的 .json 文件导入模板与快速文本（重名自动加序号，不覆盖现有内容）" />
+                            <Button Style="{StaticResource Btn}"
+                                    Margin="8,0,0,0"
+                                    Content="导出…"
+                                    Command="{Binding ExportTemplatesCommand}"
+                                    ToolTip="导出当前 Tab 或全部模板，生成可以发给同事的 .json 文件" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 右：属性 + 编辑 / 并排 / 预览 -->
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 工具条：标题 + 视图切换（快速文本没有富文本预览，只保留纯文本编辑） -->
+                        <Grid Grid.Row="0">
+                            <TextBlock Style="{StaticResource PanelLabel}"
+                                       Margin="0"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding TemplateContentTitle}" />
+                            <Border HorizontalAlignment="Right"
+                                    Background="{DynamicResource SidebarBrush}"
+                                    BorderBrush="{DynamicResource RuleStrongBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="2"
+                                    Visibility="{Binding IsMailTemplateTabActive, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource SegmentRadio}"
+                                                 GroupName="TemplateViewMode"
+                                                 Content="编辑"
+                                                 IsChecked="{Binding TemplateViewMode, Mode=TwoWay, Converter={StaticResource EnumToBoolean}, ConverterParameter=Edit}" />
+                                    <RadioButton Style="{StaticResource SegmentRadio}"
+                                                 GroupName="TemplateViewMode"
+                                                 Content="并排"
+                                                 IsChecked="{Binding TemplateViewMode, Mode=TwoWay, Converter={StaticResource EnumToBoolean}, ConverterParameter=Split}" />
+                                    <RadioButton Style="{StaticResource SegmentRadio}"
+                                                 GroupName="TemplateViewMode"
+                                                 Content="预览"
+                                                 IsChecked="{Binding TemplateViewMode, Mode=TwoWay, Converter={StaticResource EnumToBoolean}, ConverterParameter=Preview}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- 属性参数 -->
+                        <Grid Grid.Row="1" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="150" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Grid.Column="0">
+                                <TextBlock Style="{StaticResource LabelText}" Text="{Binding TemplateNameLabel}" />
+                                <TextBox Style="{StaticResource AppTextBox}"
+                                         Margin="0,4,0,0"
+                                         Text="{Binding TemplateName, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock FontSize="11.5"
+                                           Margin="0,3,0,0"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource ErrorDotBrush}"
+                                           Text="{Binding TemplateNameError}"
+                                           Visibility="{Binding TemplateNameError, Converter={StaticResource NotEmptyToVisibility}}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="0" Grid.Column="2">
+                                <TextBlock Style="{StaticResource LabelText}" Text="分组" />
+                                <TextBox Style="{StaticResource AppTextBox}"
+                                         Margin="0,4,0,0"
+                                         ToolTip="可输入自定义分组，如「客户沟通」"
+                                         Text="{Binding TemplateCategory, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <!-- 只有整封模板才有默认主题 -->
+                            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,10,0,0"
+                                        Visibility="{Binding IsMailTemplateTabActive, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource LabelText}" Text="默认主题" />
+                                <TextBox Style="{StaticResource AppTextBox}"
+                                         Margin="0,4,0,0"
+                                         Text="{Binding TemplateSubject, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock FontSize="11.5"
+                                           Margin="0,3,0,0"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource ErrorDotBrush}"
+                                           Text="{Binding TemplateSubjectError}"
+                                           Visibility="{Binding TemplateSubjectError, Converter={StaticResource NotEmptyToVisibility}}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,10,0,0">
+                                <TextBlock Style="{StaticResource LabelText}" Text="说明" />
+                                <TextBox Style="{StaticResource AppTextBox}"
+                                         Margin="0,4,0,0"
+                                         Text="{Binding TemplateDescription, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <!-- 快速文本只支持纯文本：这里说明边界，格式/主题/占位符在模板 Tab 里 -->
+                            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,10,0,0"
+                                        Visibility="{Binding IsQuickTextTabActive, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           FontSize="11.5"
+                                           TextWrapping="Wrap"
+                                           Text="快速文本是纯文本话术，会原样追加到正文光标处；不支持主题、格式、内容块与占位符。" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 内容块与占位符插入条（仅整封模板：快速文本是纯文本，插不了格式与占位符） -->
+                        <StackPanel Grid.Row="2" Margin="0,10,0,0"
+                                    Visibility="{Binding IsMailTemplateTabActive, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel LastChildFill="True">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Style="{StaticResource LabelText}"
+                                           Text="内容块"
+                                           VerticalAlignment="Center" />
+                                <ItemsControl Margin="8,0,0,0" ItemsSource="{Binding TemplateBlocks}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource Btn}"
+                                                    Padding="8,1"
+                                                    Margin="0,0,6,4"
+                                                    FontSize="12"
+                                                    Content="{Binding Title}"
+                                                    ToolTip="{Binding Hint}"
+                                                    Tag="{Binding Html}"
+                                                    Click="OnInsertTemplateBlockClick" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+
+                            <DockPanel LastChildFill="True" Margin="0,4,0,0">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Style="{StaticResource LabelText}"
+                                           Text="占位符"
+                                           VerticalAlignment="Center" />
+                                <ItemsControl Margin="8,0,0,0" ItemsSource="{Binding TemplateTokens}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource Btn}"
+                                                    Padding="8,1"
+                                                    Margin="0,0,6,4"
+                                                    FontSize="12"
+                                                    Content="{Binding Token}"
+                                                    ToolTip="{Binding Hint}"
+                                                    Tag="{Binding Token}"
+                                                    Click="OnInsertTemplateTokenClick" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                        </StackPanel>
+
+                        <!-- 编辑区 / 预览区：行高由视图模式决定，撑满剩余空间（不再按宽度取正方形） -->
+                        <Grid Grid.Row="3"
+                              Margin="0,6,0,0"
+                              Visibility="{Binding HasSelectedTemplate, Converter={StaticResource BoolToVisibility}}">
+
+                            <!-- 快速文本：纯文本多行输入，不做任何格式化（换行原样保留） -->
+                            <Border Background="{DynamicResource WindowBackgroundBrush}"
+                                    BorderBrush="{DynamicResource RuleStrongBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Visibility="{Binding IsQuickTextTabActive, Converter={StaticResource BoolToVisibility}}">
+                                <TextBox AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"
+                                         HorizontalScrollBarVisibility="Disabled"
+                                         Padding="12,10"
+                                         FontSize="13.5"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         Foreground="{DynamicResource InkBrush}"
+                                         CaretBrush="{DynamicResource InkBrush}"
+                                         SelectionBrush="{DynamicResource AccentBrush}"
+                                         Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}" />
+                            </Border>
+
+                            <!-- 邮件模板：富文本编辑 + 实时预览 -->
+                            <Grid Visibility="{Binding IsMailTemplateTabActive, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="{Binding TemplateEditorRowHeight}" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="{Binding TemplatePreviewRowHeight}" />
+                                </Grid.RowDefinitions>
+
+                                <!-- 可视化编辑：WebView2 富文本 + 左侧手柄拖拽排序 -->
+                                <Border Grid.Row="0"
+                                        Background="{DynamicResource WindowBackgroundBrush}"
+                                        BorderBrush="{DynamicResource RuleStrongBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Visibility="{Binding IsTemplateEditorVisible, Converter={StaticResource BoolToVisibility}}">
+                                    <controls:RichTextEditor x:Name="TemplateBodyEditor"
+                                                             Html="{Binding TemplateBody, Mode=TwoWay}"
+                                                             IsDark="{Binding IsDarkPreview}"
+                                                             FontSize="13.5" />
+                                </Border>
+
+                                <Border Grid.Row="1"
+                                        Height="1"
+                                        Margin="0,6"
+                                        Background="{DynamicResource RuleBrush}"
+                                        Visibility="{Binding IsTemplateSplitMode, Converter={StaticResource BoolToVisibility}}" />
+
+                                <!-- 实时预览：与邮件详情使用同一渲染管线 -->
+                                <Border Grid.Row="2"
+                                        Background="{DynamicResource ReaderBrush}"
+                                        BorderBrush="{DynamicResource RuleStrongBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Visibility="{Binding IsTemplatePreviewVisible, Converter={StaticResource BoolToVisibility}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <Border Grid.Row="0"
+                                                Padding="10,6"
+                                                Background="{DynamicResource ChromeBrush}"
+                                                BorderBrush="{DynamicResource RuleBrush}"
+                                                BorderThickness="0,0,0,1">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource MutedText}"
+                                                           FontSize="11"
+                                                           Text="实时预览（编辑内容自动同步）" />
+                                                <TextBlock Margin="0,2,0,0"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Text="{Binding TemplatePreviewSubject}" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <views:MailBodyView Grid.Row="1"
+                                                            Document="{Binding TemplatePreviewDocument}"
+                                                            HtmlSource="{Binding TemplatePreviewSource}"
+                                                            IsDark="{Binding IsDarkPreview}" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+
+                        <TextBlock Grid.Row="3"
+                                   Style="{StaticResource MutedText}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding TemplateEmptyHint}"
+                                   Visibility="{Binding HasSelectedTemplate, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                        <!-- 占位符取值 + 正文错误 -->
+                        <StackPanel Grid.Row="4">
+                            <TextBlock FontSize="11.5"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ErrorDotBrush}"
+                                       Text="{Binding TemplateBodyError}"
+                                       Visibility="{Binding TemplateBodyError, Converter={StaticResource NotEmptyToVisibility}}" />
+
+                            <Border Margin="0,6,0,0"
+                                    Padding="10,8"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource SidebarBrush}"
+                                    BorderBrush="{DynamicResource RuleBrush}"
+                                    BorderThickness="1"
+                                    Visibility="{Binding IsPlaceholderValuePanelVisible, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource LabelText}"
+                                               Text="预览取值（仅影响预览与套用结果，不写入模板）" />
+                                    <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding TemplatePlaceholderEntries}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
+                                                    <TextBlock Style="{StaticResource MutedText}"
+                                                               Width="52"
+                                                               VerticalAlignment="Center"
+                                                               Text="{Binding Token}" />
+                                                    <TextBox Style="{StaticResource AppTextBox}"
+                                                             Width="120"
+                                                             Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 底部操作 -->
+                        <Grid Grid.Row="5" Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,12,0"
+                                       Text="{Binding TemplateHint}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasTemplateErrors}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource ErrorDotBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource BtnPrimary}"
+                                        Content="{Binding TemplateSaveButtonText}"
+                                        Command="{Binding SaveTemplateCommand}" />
+                                <Button Style="{StaticResource Btn}"
+                                        Margin="8,0,0,0"
+                                        Content="另存为副本"
+                                        Command="{Binding DuplicateTemplateCommand}" />
+                                <Button Style="{StaticResource Btn}"
+                                        Margin="8,0,0,0"
+                                        Content="{Binding TemplateDeleteButtonText}"
+                                        Command="{Binding DeleteTemplateCommand}"
+                                        IsEnabled="{Binding CanDeleteTemplate}" />
+                                <Button Style="{StaticResource Btn}"
+                                        Margin="8,0,0,0"
+                                        Content="恢复默认"
+                                        Command="{Binding RestoreBuiltinTemplateCommand}"
+                                        Visibility="{Binding IsBuiltinTemplate, Converter={StaticResource BoolToVisibility}}" />
+                                <Button Style="{StaticResource BtnGhost}"
+                                        Margin="8,0,0,0"
+                                        Content="应用到新邮件"
+                                        Command="{Binding ApplyTemplateCommand}"
+                                        Visibility="{Binding IsMailTemplateTabActive, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <!-- ============ 标签 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsTagsSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="标签编辑" />
+                                <TextBlock Style="{StaticResource MutedText}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Text="标签按账户隔离，只在所属账户的邮件上可用；每个标签可绑定一个单键（1-9 / A-Z / F2-F12）。在邮件列表选中邮件后按该键即可打 / 取消标签，再按一次取消。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}" Width="86" VerticalAlignment="Center" Text="所属账户" />
+                                    <ComboBox Style="{StaticResource AppComboBox}" Width="260"
+                                              ItemsSource="{Binding TagAccounts}"
+                                              SelectedItem="{Binding SelectedTagAccount, Mode=TwoWay}">
+                                        <!-- 对象型下拉必须写 ItemTemplate：用 DisplayMemberPath 会显示类型全名 -->
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Email}" ToolTip="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="160" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="名称" />
+                                        <TextBox Style="{StaticResource AppTextBox}" Margin="0,5,0,0"
+                                                 Text="{Binding TagName, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="颜色" />
+                                        <controls:ColorPickerBox Margin="0,5,0,0" Hex="{Binding TagColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="快捷键（单键）" />
+                                        <ComboBox Style="{StaticResource AppComboBox}" Margin="0,5,0,0"
+                                                  ItemsSource="{Binding TagKeyOptions}"
+                                                  SelectedIndex="{Binding TagKeyIndex, Mode=TwoWay}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Style="{StaticResource MutedText}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Text="同一个账户内键位不能重复（不同账户可以都用 1）；F5 是刷新键、F1 预留，不给标签使用。快捷键只在主窗口生效，焦点在输入框或正文里时不会触发。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource Btn}" Content="新建" Command="{Binding NewTagCommand}" />
+                                    <Button Style="{StaticResource BtnPrimary}" Margin="8,0,0,0" Content="保存标签" Command="{Binding SaveTagCommand}" />
+                                    <Button Style="{StaticResource Btn}" Margin="8,0,0,0" Content="删除" Command="{Binding DeleteTagCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="当前账户的标签" />
+                                <ListBox Margin="0,10,0,0" MaxHeight="320" Style="{StaticResource AppListBox}"
+                                         ItemContainerStyle="{StaticResource PanelListItem}"
+                                         ItemsSource="{Binding Tags}"
+                                         SelectedItem="{Binding SelectedTag, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="4,4">
+                                                <Border Width="12" Height="12" CornerRadius="3" VerticalAlignment="Center"
+                                                        Background="{Binding Color}" />
+                                                <TextBlock Text="{Binding Name}" Margin="8,0,0,0" FontWeight="SemiBold"
+                                                           VerticalAlignment="Center" Foreground="{DynamicResource InkBrush}" />
+                                                <Border Margin="10,0,0,0" Padding="6,1" CornerRadius="4"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource AccentSoftBrush}"
+                                                        Visibility="{Binding HasShortcut, Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBlock Text="{Binding ShortcutDisplay}" FontSize="11"
+                                                               Foreground="{DynamicResource AccentBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Style="{StaticResource MutedText}" Margin="0,8,0,0"
+                                           Text="提示：邮件右键「打标签…」可勾选多个标签；批量选中邮件后同样适用。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- ============ 规则 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsRulesSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="规则编辑" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="新邮件入库后自动执行：条件为“发件人包含 / 发件域包含 / 主题包含”的与关系。星标/已读/打标签可叠加，移动到文件夹/归档/垃圾邮件会终止后续规则；勾选“命中后继续执行后续规则”可让规则依次全部生效。" />
+
+                                <TextBlock Style="{StaticResource LabelText}" Text="规则名称（可留空）" Margin="0,14,0,0" />
+                                <TextBox Style="{StaticResource AppTextBox}"
+                                         Margin="0,5,0,0"
+                                         Text="{Binding RuleName, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="发件人包含" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Margin="0,5,0,0"
+                                                 Text="{Binding RuleFromContains, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="发件域包含" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Margin="0,5,0,0"
+                                                 ToolTip="例如 maersk.com；用来把某船司 / 客户的来信自动归类"
+                                                 Text="{Binding RuleFromDomain, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="主题包含" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Margin="0,5,0,0"
+                                                 Text="{Binding RuleSubjectContains, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="动作" />
+                                        <ComboBox Style="{StaticResource AppComboBox}"
+                                                  Margin="0,5,0,0"
+                                                  ItemsSource="{Binding RuleActionOptions}"
+                                                  SelectedIndex="{Binding RuleActionIndex, Mode=TwoWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Visibility="{Binding IsRuleMoveAction, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="目标文件夹" />
+                                        <ComboBox Style="{StaticResource AppComboBox}"
+                                                  Margin="0,5,0,0"
+                                                  ItemsSource="{Binding RuleFolders}"
+                                                  SelectedItem="{Binding RuleTargetFolder, Mode=TwoWay}">
+                                            <!-- 自定义 ComboBox 模板的选中框只认 ItemTemplate：用 DisplayMemberPath 会退回 ToString() -->
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               ToolTip="{Binding FullName}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Visibility="{Binding IsRuleTagAction, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="要添加的标签" />
+                                        <ComboBox Style="{StaticResource AppComboBox}"
+                                                  Margin="0,5,0,0"
+                                                  ItemsSource="{Binding RuleTags}"
+                                                  SelectedItem="{Binding RuleTag, Mode=TwoWay}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Width="10"
+                                                                Height="10"
+                                                                CornerRadius="3"
+                                                                VerticalAlignment="Center"
+                                                                Background="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   Margin="6,0,0,0"
+                                                                   VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Margin="0,12,0,0"
+                                          Content="启用该规则"
+                                          IsChecked="{Binding RuleEnabled}" />
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Margin="0,8,0,0"
+                                          Content="命中后继续执行后续规则"
+                                          ToolTip="关闭时：星标/已读可继续叠加，移动到文件夹/归档/垃圾邮件会终止后续规则；打开后任何动作都不打断后续匹配。"
+                                          IsChecked="{Binding RuleContinueAfterMatch}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource Btn}" Content="新建" Command="{Binding NewRuleCommand}" />
+                                    <Button Style="{StaticResource BtnPrimary}" Margin="8,0,0,0" Content="保存规则" Command="{Binding SaveRuleCommand}" />
+                                    <Button Style="{StaticResource Btn}" Margin="8,0,0,0" Content="删除" Command="{Binding DeleteRuleCommand}" />
+                                    <Button Style="{StaticResource BtnGhost}"
+                                            Margin="8,0,0,0"
+                                            Content="对已有邮件执行一次"
+                                            Command="{Binding RunRuleOnceCommand}"
+                                            IsEnabled="{Binding HasSelectedRuleForRun}"
+                                            ToolTip="用当前选中的规则整理已经收到的邮件（新规则只对之后入库的邮件生效，这里补跑一次）" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="已配置规则" />
+                                <ListBox Margin="0,10,0,0"
+                                         MaxHeight="320"
+                                         Style="{StaticResource AppListBox}"
+                                         ItemContainerStyle="{StaticResource PanelListItem}"
+                                         ItemsSource="{Binding Rules}"
+                                         SelectedItem="{Binding SelectedRule, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4,2">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkBrush}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Style="{StaticResource MutedText}"
+                                                           Margin="0,3,0,0"
+                                                           Text="{Binding ConditionDisplay}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Style="{StaticResource MutedText}"
+                                                           Margin="0,2,0,0"
+                                                           Text="{Binding ActionDisplay}" />
+                                                <TextBlock Style="{StaticResource MutedText}"
+                                                           Margin="0,2,0,0"
+                                                           Text="{Binding HitDisplay}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           Text="提示：规则默认只作用于同步新入库的邮件；已经收到的邮件可选中规则后点「对已有邮件执行一次」补跑（动作同样先本地生效，再异步回写服务器）。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- ============ 货代（行业功能开关） ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsFreightSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="货代行业功能" />
+                                <TextBlock Style="{StaticResource MutedText}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Text="这些是货代邮件工作台特有的识别与提醒能力。不做货代业务时可以把总开关关掉，界面会回到通用邮箱的样子。" />
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Margin="0,14,0,0"
+                                          FontWeight="SemiBold"
+                                          Content="启用货代行业功能（总开关）"
+                                          IsChecked="{Binding FreightFeaturesEnabled, Mode=TwoWay}" />
+
+                                <Border Margin="0,12,0,0"
+                                        Padding="14,6,14,10"
+                                        CornerRadius="8"
+                                        Background="{DynamicResource SidebarBrush}"
+                                        BorderBrush="{DynamicResource RuleBrush}"
+                                        BorderThickness="1"
+                                        IsEnabled="{Binding IsFreightOptionsEnabled}">
+                                    <StackPanel>
+                                        <CheckBox Style="{StaticResource RowCheckBox}"
+                                                  Content="业务编号识别（Job / SO / B/L / 箱号 / 封号 / 船名 / 港口）"
+                                                  IsChecked="{Binding FreightReferencesEnabled, Mode=TwoWay}" />
+                                        <TextBlock Style="{StaticResource MutedText}" Margin="26,-2,0,6" TextWrapping="Wrap"
+                                                   Text="从主题与正文抽取单号，用于邮件头业务卡片、右栏「业务单号」聚合、一票货案件与 booking: / bl: / ctr: 搜索。" />
+
+                                        <CheckBox Style="{StaticResource RowCheckBox}"
+                                                  Content="行业邮件类型（订舱确认 / SI / VGM / 提单草稿 / AN / 账单 / 查验 / 甩柜 / 延误）"
+                                                  IsChecked="{Binding FreightMailTypesEnabled, Mode=TwoWay}" />
+                                        <TextBlock Style="{StaticResource MutedText}" Margin="26,-2,0,6" TextWrapping="Wrap"
+                                                   Text="按主题与正文关键词判定邮件类型，用于邮件头类型标签与 type: 搜索。" />
+
+                                        <CheckBox Style="{StaticResource RowCheckBox}"
+                                                  Content="时效节点（截关 / 截补料 / VGM / ETD / ETA）"
+                                                  IsChecked="{Binding FreightDeadlinesEnabled, Mode=TwoWay}" />
+                                        <TextBlock Style="{StaticResource MutedText}" Margin="26,-2,0,6" TextWrapping="Wrap"
+                                                   Text="抽取时效节点并在左栏做倒计时看板；点击节点可打开对应的一票货案件。" />
+
+                                        <CheckBox Style="{StaticResource RowCheckBox}"
+                                                  Content="等待回复跟进（到点托盘提醒一次）"
+                                                  IsChecked="{Binding FreightFollowUpsEnabled, Mode=TwoWay}" />
+                                        <TextBlock Style="{StaticResource MutedText}" Margin="26,-2,0,0" TextWrapping="Wrap"
+                                                   Text="标记「等待回复」的邮件到点后提醒一次；关闭后不再提醒，已有跟进记录保留。" />
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Style="{StaticResource MutedText}" Margin="0,12,0,0" TextWrapping="Wrap"
+                                           Text="关闭只影响之后同步入库的邮件与界面入口，已识别的数据不会被删除；重新开启后会自动补扫这段时间的邮件。修改后点右下角「保存设置」生效。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- ============ 反垃圾（本地黑白名单） ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsFiltersSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="本地发件人黑白名单" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="新邮件入库时判定发件人：黑名单直接标记为垃圾邮件并跳过规则；白名单优先，永不判为垃圾邮件。判定只影响本地，不改写服务器状态。" />
+
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="1.4*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="地址或域名" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Margin="0,5,0,0"
+                                                 Text="{Binding FilterPattern, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="类型" />
+                                        <ComboBox Style="{StaticResource AppComboBox}"
+                                                  Margin="0,5,0,0"
+                                                  ItemsSource="{Binding SenderFilterKindOptions}"
+                                                  SelectedIndex="{Binding FilterKindIndex, Mode=TwoWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource LabelText}" Text="备注（可选）" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Margin="0,5,0,0"
+                                                 Text="{Binding FilterNote, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="支持 boss@example.com（精确地址）、@example.com 或 example.com（整个域名）" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource BtnPrimary}"
+                                            Content="添加到名单"
+                                            Command="{Binding AddSenderFilterCommand}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="删除选中"
+                                            Command="{Binding DeleteSenderFilterCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="名单条目" />
+                                <ListBox Margin="0,10,0,0"
+                                         MaxHeight="340"
+                                         Style="{StaticResource AppListBox}"
+                                         ItemContainerStyle="{StaticResource PanelListItem}"
+                                         ItemsSource="{Binding SenderFilters}"
+                                         SelectedItem="{Binding SelectedSenderFilter, Mode=TwoWay}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4,2">
+                                                <TextBlock Text="{Binding Pattern}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkBrush}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Style="{StaticResource MutedText}"
+                                                           Margin="0,2,0,0"
+                                                           Text="{Binding DetailDisplay}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           Text="提示：名单仅作用于同步新入库的邮件；已收到的邮件不会自动重新分类。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+                <!-- ============ 存储与清理 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsStorageSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <!-- 数据保存目录：只写指针，下次启动时迁移 -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="数据保存目录" />
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="邮件数据库、附件缓存、账户配置与模板都保存在这个目录里。可以改到其它本地磁盘，迁移时只复制、不删除，原目录会保留作为备份。" />
+
+                                <Border Margin="0,10,0,0"
+                                        Padding="10,7"
+                                        CornerRadius="6"
+                                        Background="{DynamicResource WindowBackgroundBrush}"
+                                        BorderBrush="{DynamicResource RuleBrush}"
+                                        BorderThickness="1">
+                                    <TextBlock Text="{Binding DataDirectory}"
+                                               FontFamily="Consolas, Microsoft YaHei UI"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                </Border>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,6,0,0"
+                                           FontSize="11.5"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding DataDirectoryDefaultText}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Style="{StaticResource BtnPrimary}"
+                                            Content="修改目录…"
+                                            Command="{Binding BrowseDataDirectoryCommand}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="恢复默认目录"
+                                            Command="{Binding ResetDataDirectoryCommand}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="打开目录"
+                                            Command="{Binding OpenDataFolderCommand}" />
+                                </StackPanel>
+
+                                <Border Margin="0,12,0,0"
+                                        Padding="10,8"
+                                        CornerRadius="6"
+                                        Background="{DynamicResource AccentSoftBrush}"
+                                        Visibility="{Binding HasPendingDataMigration, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding PendingDataMigrationText}"
+                                                   TextWrapping="Wrap"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource InkBrush}" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                Margin="0,8,0,0"
+                                                HorizontalAlignment="Left"
+                                                Content="取消这次迁移"
+                                                Command="{Binding CancelPendingDataMigrationCommand}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           FontSize="11.5"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding DataDirectoryHint}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Style="{StaticResource CardTitle}"
+                                               Text="本地存储占用"
+                                               VerticalAlignment="Center" />
+                                    <Button Style="{StaticResource Btn}"
+                                            HorizontalAlignment="Right"
+                                            Content="重新统计"
+                                            Command="{Binding RefreshStorageCommand}" />
+                                </Grid>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding StorageUsageText}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,4,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding StorageDiskText}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,4,0,0"
+                                           Text="{Binding StorageCountText}" />
+
+                                <ProgressBar Height="8"
+                                             Margin="0,12,0,0"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding StorageUsagePercent, Mode=OneWay}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <TextBlock Text="{Binding StorageLevelText}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="10,0,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding StorageAlertText}" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource BtnPrimary}"
+                                            Content="历史邮件清理"
+                                            Command="{Binding OpenCleanupCommand}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="清理超期隔离"
+                                            Command="{Binding PurgeExpiredCommand}"
+                                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                            ToolTip="彻底删除超过隔离保留期的数据并释放磁盘空间" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="分级空间预警" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="启用磁盘空间不足预警"
+                                          IsChecked="{Binding Settings.StorageAlertsEnabled}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="提示阈值" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding Settings.StorageNoticePercent, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="%" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               Margin="18,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="警告阈值" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding Settings.StorageWarningPercent, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="%" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               Margin="18,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="严重阈值" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding Settings.StorageCriticalPercent, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="%" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="存储上限" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding StorageLimitGb, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="GB（0 表示按磁盘容量计算占用比例）" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="自动定期清理" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="按保留策略自动清理历史邮件（程序运行期间后台执行）"
+                                          IsChecked="{Binding Settings.AutoCleanupEnabled}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="执行间隔" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding Settings.AutoCleanupIntervalHours, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="小时" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               Margin="18,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="保留期" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding Settings.AutoCleanupRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="天前的邮件" />
+                                </StackPanel>
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="自动清理包含垃圾箱"
+                                          IsChecked="{Binding Settings.AutoCleanupIncludeTrash}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="自动清理包含广告邮件"
+                                          IsChecked="{Binding Settings.AutoCleanupIncludeJunk}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="收件箱与已发送不会自动清理；星标邮件与草稿始终保护。自动清理同样进入隔离区，可在清理记录中撤销。" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="隔离区" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="保留天数" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="70"
+                                             Text="{Binding Settings.CleanupQuarantineDays, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="天（期间可完整撤销，超期自动彻底删除）" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ 数据 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsDataSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="导入邮件（.eml）" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="从 Foxmail / Outlook 等客户端导出的 .eml 文件批量导入指定文件夹；按 Message-ID 去重，重复导入同一文件不会产生副本。导入的历史邮件默认标记为已读。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource LabelText}"
+                                               VerticalAlignment="Center"
+                                               Text="账户" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="240"
+                                              Margin="12,0,0,0"
+                                              ItemsSource="{Binding Accounts}"
+                                              SelectedItem="{Binding ImportAccount, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Email}" TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Style="{StaticResource LabelText}"
+                                               Margin="18,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="目标文件夹" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="200"
+                                              Margin="12,0,0,0"
+                                              ItemsSource="{Binding ImportFolders}"
+                                              SelectedItem="{Binding ImportFolder, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Style="{StaticResource BtnPrimary}"
+                                            Margin="12,0,0,0"
+                                            Content="选择 .eml 并导入…"
+                                            IsEnabled="{Binding IsImporting, Converter={StaticResource InverseBool}}"
+                                            Command="{Binding ImportEmlCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding ImportStatus}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="联系人导入 / 导出" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="从 Foxmail / Outlook / 手机通讯录导入 vCard（.vcf）或 CSV，也可把本地地址簿导出备份；导入只刷新姓名，不计入往来次数。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource Btn}"
+                                            Content="导入联系人…"
+                                            Command="{Binding ImportContactsCommand}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="导出联系人…"
+                                            Command="{Binding ExportContactsCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding ContactsStatus}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="本地数据" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="全部邮件缓存在本机 SQLite（WAL + FTS5 全文索引），凭据以 AES-256-GCM 加密保存，不上传任何第三方服务器。" />
+
+                                <TextBlock Style="{StaticResource LabelText}" Text="数据目录" Margin="0,14,0,0" />
+                                <Grid Margin="0,5,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Style="{StaticResource AppTextBox}"
+                                             IsReadOnly="True"
+                                             Text="{Binding DataDirectory}" />
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="打开目录"
+                                            Command="{Binding OpenDataFolderCommand}" />
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Text="存储占用："
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding StorageSize}"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="16,0,0,0"
+                                            Content="清理正文缓存"
+                                            Command="{Binding ClearBodyCacheCommand}"
+                                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                            ToolTip="清空已下载的正文与附件，邮件头保留，阅读时重新下载" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="重建搜索索引"
+                                            Command="{Binding RebuildIndexCommand}"
+                                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                            ToolTip="搜索不到邮件或数据升级后，重新生成全文索引" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="导出与备份（FR-13）" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="把数据库与 .eml 原始邮件目录打包为 zip，便于本机备份或迁移。" />
+                                <Button Style="{StaticResource BtnPrimary}"
+                                        Margin="0,14,0,0"
+                                        HorizontalAlignment="Left"
+                                        Content="导出为 ZIP"
+                                        Command="{Binding ExportCommand}"
+                                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ 升级 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsUpdateSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="升级服务" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="只填写升级服务的根地址（域名、IP 或完整 URL，可带端口与路径前缀），具体接口由客户端内置约定。留空时使用安装目录 update.json 里的地址；两者都没有则不会发起检测。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="服务地址" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="330"
+                                             ToolTip="例如 updates.example.com:8080 或 https://updates.example.com/zungmail"
+                                             Text="{Binding UpdateServiceUrl, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="立即检测"
+                                            Command="{Binding CheckUpdatesNowCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource UpdateAddressHint}"
+                                           Margin="86,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding UpdateAddressPreview}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="渠道" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="180"
+                                              ItemsSource="{Binding UpdateChannelOptions}"
+                                              SelectedIndex="{Binding UpdateChannelIndex, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="启动后自动检测新版本（只提示，不自动下载或安装）"
+                                          IsChecked="{Binding UpdateAutoCheckEnabled}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="检测时机" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="180"
+                                              ToolTip="客户端启动后等待该时长再检测，避免和收信、索引初始化抢资源"
+                                              ItemsSource="{Binding UpdateDelayOptions}"
+                                              SelectedIndex="{Binding UpdateDelayIndex, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,12,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="自动检测失败只写日志与状态栏，不会弹窗打断操作；手动检测失败会给出可操作的原因。" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="检测与安装" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding UpdateStatusText}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Style="{StaticResource BtnPrimary}"
+                                            Content="{Binding UpdateActionText}"
+                                            Command="{Binding OpenUpdateWindowCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,12,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="下载完成后点「立即安装」：客户端会先保存草稿与设置，再关闭自身并启动安装程序，装好后自动重新打开。覆盖安装只替换程序文件，本地邮件数据库、账户、设置、模板与 .eml 都不会被删除。如果发布的是便携版 zip，窗口里不会出现「立即安装」，需下载后手动解压覆盖。" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="接口约定（部署参考）" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="升级服务固定提供以下接口，客户端只拼根地址，不需要用户填写具体接口：" />
+                                <TextBlock FontFamily="Consolas"
+                                           FontSize="12"
+                                           Margin="0,10,0,0"
+                                           Foreground="{DynamicResource Ink2Brush}"
+                                           TextWrapping="Wrap"
+                                           Text="GET /api/update/check?current=1.0.0&amp;channel=stable&amp;os=windows&amp;arch=x64" />
+                                <TextBlock FontFamily="Consolas"
+                                           FontSize="12"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource Ink2Brush}"
+                                           Text="GET /api/update/download/{id}（支持 Range 断点）" />
+                                <TextBlock FontFamily="Consolas"
+                                           FontSize="12"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource Ink2Brush}"
+                                           Text="GET /api/update/ping" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="完整部署与接口说明见仓库 docs/升级服务部署与客户端升级说明.md。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ 反馈 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsFeedbackSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="问题反馈" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="反馈直接提交到升级服务，开发者可在管理页查看。请先选分类，再尽量写清「做了什么、看到什么、期望什么」，越具体越好定位。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="分类" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="180"
+                                              ItemsSource="{Binding FeedbackCategoryOptions}"
+                                              SelectedIndex="{Binding FeedbackCategoryIndex, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,14,0,5"
+                                           Text="问题描述（必填）" />
+                                <Border Background="{DynamicResource WindowBackgroundBrush}"
+                                        BorderBrush="{DynamicResource RuleStrongBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6">
+                                    <TextBox AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             Height="150"
+                                             VerticalContentAlignment="Top"
+                                             VerticalScrollBarVisibility="Auto"
+                                             HorizontalScrollBarVisibility="Disabled"
+                                             Padding="12,10"
+                                             FontSize="13.5"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             Foreground="{DynamicResource InkBrush}"
+                                             CaretBrush="{DynamicResource InkBrush}"
+                                             SelectionBrush="{DynamicResource AccentBrush}"
+                                             Text="{Binding FeedbackDescription, UpdateSourceTrigger=PropertyChanged}" />
+                                </Border>
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,6,0,0"
+                                           Text="{Binding FeedbackDescriptionHint}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="86"
+                                               VerticalAlignment="Center"
+                                               Text="联系方式" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="330"
+                                             ToolTip="可留空；填写后方便回访确认问题"
+                                             Text="{Binding FeedbackContact, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="附加最近日志（已脱敏，最多 512 KB）"
+                                          IsChecked="{Binding FeedbackAttachLog}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="24,2,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding FeedbackLogHint}" />
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="附加系统环境（版本、操作系统、.NET、邮件与账户数量）"
+                                          IsChecked="{Binding FeedbackAttachEnvironment}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="环境摘要只含版本、系统与规模统计，不含邮箱地址、账户口令与邮件正文；日志里的邮箱与口令在提交前会替换为占位符。" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Button Style="{StaticResource BtnPrimary}"
+                                            Content="{Binding FeedbackSubmitText}"
+                                            Command="{Binding SubmitFeedbackCommand}"
+                                            IsEnabled="{Binding CanSubmitFeedback}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="复制反馈内容"
+                                            ToolTip="未配置或连不上升级服务时，复制后可直接发给开发者"
+                                            Command="{Binding CopyFeedbackContentCommand}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="8,0,0,0"
+                                            Content="清空"
+                                            Command="{Binding ClearFeedbackCommand}" />
+                                </StackPanel>
+
+                                <TextBlock Style="{StaticResource FeedbackResult}"
+                                           Margin="0,12,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding FeedbackResultText}"
+                                           Visibility="{Binding HasFeedbackResult, Converter={StaticResource BoolToVisibility}}" />
+
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,10,0,0"
+                                            Visibility="{Binding HasFeedbackSubmittedId, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               VerticalAlignment="Center"
+                                               Text="反馈编号" />
+                                    <TextBlock Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               FontFamily="Consolas"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               Text="{Binding FeedbackSubmittedId}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="10,0,0,0"
+                                            Height="28"
+                                            MinHeight="28"
+                                            Content="复制编号"
+                                            Command="{Binding CopyFeedbackIdCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="提交与隐私" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="提交复用「升级」分区里的服务地址，接口固定为下面这条；不需要另配服务器。" />
+                                <TextBlock FontFamily="Consolas"
+                                           FontSize="12"
+                                           Margin="0,10,0,0"
+                                           Foreground="{DynamicResource Ink2Brush}"
+                                           Text="POST /api/feedback（JSON，上限 1 MB）" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="服务端默认按来源每小时限 10 条、保留最近 200 条，管理页「用户反馈」页签可查看、复制日志与删除。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ 关于 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsAboutSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <!-- 应用信息：名称、版本与运行形态 -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- 品牌徽标：与标题栏、任务栏、安装包同一张图标 -->
+                                    <Image Grid.Column="0"
+                                           Width="44"
+                                           Height="44"
+                                           Margin="0,0,14,0"
+                                           VerticalAlignment="Center"
+                                           Source="pack://application:,,,/Assets/Brand/ZungMailMark.png"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource InkBrush}"
+                                                   Text="ZungMail" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="0,3,0,0"
+                                                   Text="个人邮件客户端" />
+                                    </StackPanel>
+                                    <!-- 发行形态徽标：版本号已移到主界面标题栏，这里只标「个人版」 -->
+                                    <Border Grid.Column="2"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource AccentSoftBrush}"
+                                            CornerRadius="10"
+                                            Padding="9,3"
+                                            ToolTip="{Binding AppVersion, StringFormat=当前版本 v{0}}">
+                                        <TextBlock FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Text="个人版" />
+                                    </Border>
+                                </Grid>
+
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="表现层" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="WPF + MVVM（.NET 8）" />
+
+                                    <TextBlock Grid.Row="1" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="本地存储" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="SQLite（WAL 模式 + FTS5 全文索引）" />
+
+                                    <TextBlock Grid.Row="2" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="邮件协议" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="MailKit · IMAP 993（SSL）/ SMTP 465（SSL）" />
+
+                                    <TextBlock Grid.Row="3" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="凭据安全" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="AES-256-GCM 加密后本地存储，不上传" />
+
+                                    <TextBlock Grid.Row="4" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="数据位置" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="全部邮件与索引保存在本机，可离线使用" />
+
+                                    <TextBlock Grid.Row="5" Style="{StaticResource MutedText}" Text="数据目录" />
+                                    <TextBlock Grid.Row="5" Grid.Column="1"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding DataDirectory}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 桌面快捷方式兜底：安装器写的是 %PUBLIC%\Desktop，个别机器会被清理掉或被安全软件拦写 -->
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="桌面快捷方式" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="安装程序会在所有用户的公共桌面创建图标。如果安装时提示「警告 1909 无法创建快捷方式」（该目录被清理工具删掉或被安全软件拦写），可以在这里用自己的账户重建一个，不需要重新安装。" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding ShortcutStatusText}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button Style="{StaticResource Btn}"
+                                            Content="创建桌面快捷方式"
+                                            ToolTip="在当前用户桌面创建或覆盖 ZungMail.lnk"
+                                            Command="{Binding CreateDesktopShortcutCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 离线使用教程：随程序发布，不依赖网络 -->
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="使用教程" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="0,8,0,0"
+                                               TextWrapping="Wrap"
+                                               Text="从添加账户、收信阅读、写邮件到标签、规则、时效节点与数据备份的完整离线教程。HTML 文件随程序发布，不需要联网。" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource BtnPrimary}"
+                                        VerticalAlignment="Center"
+                                        Content="打开使用教程"
+                                        ToolTip="用系统默认浏览器打开随程序发布的 HTML 教程"
+                                        Command="{Binding OpenUserGuideCommand}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- 应用说明：沿用原「关于」模块的说明文案 -->
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="应用说明" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="WPF + MVVM · MailKit（IMAP 993 / SMTP 465 强制 SSL）· SQLite FTS5 本地全文检索" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="只要网络可达邮件服务器，即可在离线状态下浏览已缓存的历史邮件与全文检索结果；正文渲染在 WebView2 中完成，脚本与远程资源默认按安全策略拦截。" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 开源协议：列出实际引用的第三方组件与许可 -->
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="开源协议" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="本应用基于以下开源项目构建，版权归各自作者所有，遵循其对应许可协议：" />
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" MinWidth="200" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,6" Text="MailKit / MimeKit" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource MutedText}" Margin="0,0,0,6" Text="MIT" />
+
+                                    <TextBlock Grid.Row="1" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,6" Text="AngleSharp" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource MutedText}" Margin="0,0,0,6" Text="MIT" />
+
+                                    <TextBlock Grid.Row="2" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,6" Text="CommunityToolkit.Mvvm" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource MutedText}" Margin="0,0,0,6" Text="MIT" />
+
+                                    <TextBlock Grid.Row="3" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,6" Text="Microsoft.Web.WebView2" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource MutedText}" Margin="0,0,0,6" Text="Microsoft 软件许可" />
+
+                                    <TextBlock Grid.Row="4" Foreground="{DynamicResource InkBrush}" Margin="0,0,0,6" Text="SQLite（Microsoft.Data.Sqlite）" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource MutedText}" Margin="0,0,0,6" Text="公有领域" />
+
+                                    <TextBlock Grid.Row="5" Foreground="{DynamicResource InkBrush}" Text=".NET 8 / WPF" />
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource MutedText}" Text="MIT" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 版权声明 -->
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="版权声明" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="© 2026 ZungMail · 保留所有权利。" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="本软件按现状提供，不对特定用途的适用性作出担保；第三方组件的版权与许可条款以上述开源协议为准。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- 底部操作栏 -->
+            <Border Grid.Row="2"
+                    Background="{DynamicResource ChromeBrush}"
+                    BorderBrush="{DynamicResource RuleBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Style="{StaticResource MutedText}"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               Text="{Binding StatusText}" />
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Style="{StaticResource BtnPrimary}"
+                                Content="保存设置"
+                                Command="{Binding SaveSettingsCommand}" />
+                        <Button Style="{StaticResource Btn}"
+                                Margin="8,0,0,0"
+                                Content="关闭"
+                                Command="{Binding CloseCommand}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</views:DialogWindow>

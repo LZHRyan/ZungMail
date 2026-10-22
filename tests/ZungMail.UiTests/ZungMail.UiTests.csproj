@@ -1,0 +1,108 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 引用 WPF 应用层（ZungMail.App）做主界面旅程验证，因此跟随其目标框架 -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ZungMail.UiTests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 复用协议测试已有的 IMAP 会话替身，避免两套实现漂移 -->
+    <Compile Include="..\ZungMail.Tests\FakeImapSession.cs" Link="Fakes\FakeImapSession.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 控件高度回归测试直接解析主题源文件（免去在测试进程里创建 WPF Application / pack 方案） -->
+    <None Include="..\..\src\ZungMail.App\Themes\Controls.xaml"
+          Link="Theme\Controls.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 图标几何回归（新增图标 / 图标开关状态）直接解析图标字典 -->
+    <None Include="..\..\src\ZungMail.App\Themes\Icons.xaml"
+          Link="Theme\Icons.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 升级数据安全回归：直接解析安装包脚本，断言安装段不删除数据目录 -->
+    <None Include="..\..\packaging\ZungMail.nsi"
+          Link="Packaging\ZungMail.nsi"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 升级体验回归（A+B）：MSI 自动启动行为 + 便携版不再当安装包 -->
+    <None Include="..\..\packaging\New-MsiSource.ps1"
+          Link="Packaging\New-MsiSource.ps1"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 发布链回归：版本号 / 产物命名 / UpgradeCode / 旧版 MailClient 清理逻辑 -->
+    <None Include="..\..\Directory.Build.props"
+          Link="Packaging\Directory.Build.props"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\packaging\build-msi.ps1"
+          Link="Packaging\build-msi.ps1"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\packaging\build-installer.ps1"
+          Link="Packaging\build-installer.ps1"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\packaging\sign.ps1"
+          Link="Packaging\sign.ps1"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 品牌资源回归：解析 ico 尺寸表、PNG 像素尺寸与 csproj 里的图标注册 -->
+    <None Include="..\..\src\ZungMail.App\Assets\Brand\ZungMail.ico"
+          Link="Brand\ZungMail.ico"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\Assets\Brand\ZungMailMark.png"
+          Link="Brand\ZungMailMark.png"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\Assets\Brand\ZungMailMark64.png"
+          Link="Brand\ZungMailMark64.png"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\ZungMail.App.csproj"
+          Link="Brand\ZungMail.App.csproj"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 品牌母版（docs\brand）：应用内的图标必须与母版逐字节一致，防止换图标时漏同步 -->
+    <None Include="..\..\docs\brand\zungmail-logo\zungmail.ico"
+          Link="Brand\Master\zungmail.ico"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\docs\brand\zungmail-logo\png\zungmail-256.png"
+          Link="Brand\Master\zungmail-256.png"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\docs\brand\zungmail-logo\png\zungmail-64.png"
+          Link="Brand\Master\zungmail-64.png"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\Views\UpdateWindow.xaml"
+          Link="Views\UpdateWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 教程入口回归：解析设置页 XAML，确认「关于」分区仍有打开教程按钮 -->
+    <None Include="..\..\src\ZungMail.App\Views\SettingsWindow.xaml"
+          Link="Views\SettingsWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 搜索语法 @ 选择器：解析主窗口 XAML，确认弹出层与事件绑定没有被删掉 -->
+    <None Include="..\..\src\ZungMail.App\Views\MainWindow.xaml"
+          Link="Views\MainWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 查看邮件源码：窗口结构、右键入口与只读文本框回归 -->
+    <None Include="..\..\src\ZungMail.App\Views\MailSourceWindow.xaml"
+          Link="Views\MailSourceWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 通讯录：搜索框观感与分页栏回归，直接解析窗口 XAML -->
+    <None Include="..\..\src\ZungMail.App\Views\AddressBookWindow.xaml"
+          Link="Views\AddressBookWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 陌生发件人标识：独立阅读窗口的提示条 + App 级资源（图标/转换器）解析 -->
+    <None Include="..\..\src\ZungMail.App\Views\MailReaderWindow.xaml"
+          Link="Views\MailReaderWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\App.xaml"
+          Link="App.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ZungMail.App\ZungMail.App.csproj" />
+  </ItemGroup>
+
+</Project>

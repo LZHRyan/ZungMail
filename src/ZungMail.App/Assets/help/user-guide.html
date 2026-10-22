@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<title>ZungMail 使用教程</title>
+<style>
+  :root {
+    --bg: #f3f3f3;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --ink: #1a1a1a;
+    --ink-2: #3d4a5c;
+    --muted: #616161;
+    --accent: #005fb8;
+    --accent-dark: #004f99;
+    --accent-soft: #e8f1fb;
+    --border: #e2e7ef;
+    --border-strong: #d6d6d6;
+    --ok: #1a7f45;
+    --ok-soft: #e7f6ec;
+    --warn: #a15c00;
+    --warn-soft: #fdf3e3;
+    --danger: #b42318;
+    --danger-soft: #fdf2f1;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 10px 30px rgba(16, 24, 40, .06);
+    --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.7 "Microsoft YaHei UI", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3, h4, p, ul, ol, dl, dd, dt { margin: 0; }
+  h1 { font-size: 30px; line-height: 1.3; letter-spacing: -.3px; }
+  h2 { font-size: 23px; line-height: 1.35; }
+  h3 { font-size: 17px; line-height: 1.45; }
+  h4 { font-size: 15px; }
+  p + p, p + ul, p + ol, ul + p, ol + p { margin-top: 10px; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 5px; }
+  code, kbd {
+    font-family: var(--mono);
+    font-size: .9em;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 5px;
+  }
+  kbd {
+    display: inline-block;
+    min-width: 24px;
+    text-align: center;
+    padding: 2px 6px;
+    border-bottom-color: var(--border-strong);
+    box-shadow: 0 1px 0 var(--border-strong);
+    background: #fff;
+  }
+  .skip { position: absolute; left: -9999px; top: 8px; background: #fff; padding: 8px 12px; z-index: 100; }
+  .skip:focus { left: 8px; }
+
+  .shell {
+    width: min(1280px, calc(100% - 32px));
+    margin: 24px auto 48px;
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 22px;
+    align-items: start;
+  }
+
+  .side {
+    position: sticky;
+    top: 18px;
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px 12px; }
+  .logo {
+    width: 34px; height: 34px;
+    display: grid; place-items: center; flex: 0 0 auto;
+  }
+  .logo svg { width: 34px; height: 34px; display: block; }
+  .brand strong { display: block; font-size: 14px; line-height: 1.3; }
+  .brand small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  .search {
+    width: 100%;
+    height: 34px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12.5px;
+    padding: 0 10px;
+    outline: none;
+  }
+  .search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .nav { display: grid; gap: 2px; margin-top: 12px; }
+  .nav a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 9px;
+    border-radius: 7px;
+    color: var(--ink-2);
+    font-size: 12.5px;
+  }
+  .nav a:hover { background: var(--surface-2); text-decoration: none; }
+  .nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .nav a .n {
+    width: 20px; height: 20px; border-radius: 6px;
+    display: grid; place-items: center;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 10.5px; font-weight: 600; flex: 0 0 auto;
+  }
+  .nav a.active .n { background: #fff; color: var(--accent); border-color: #c7ddf3; }
+  .nav-empty { display: none; color: var(--muted); font-size: 12px; padding: 8px 9px; }
+  .side-foot { border-top: 1px solid var(--border); margin-top: 12px; padding: 12px 6px 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+  .side-foot button {
+    margin-top: 8px; width: 100%; height: 30px;
+    border: 1px solid var(--border-strong); border-radius: 7px;
+    background: var(--surface); color: var(--ink-2); font: inherit; font-size: 11.5px;
+    cursor: pointer;
+  }
+  .side-foot button:hover { background: var(--surface-2); }
+
+  main { min-width: 0; display: grid; gap: 16px; }
+  .hero {
+    background:
+      radial-gradient(900px 320px at 10% -30%, #dcecff 0%, transparent 65%),
+      radial-gradient(700px 300px at 100% 0%, #e9e4fb 0%, transparent 55%),
+      var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 28px 30px 24px;
+  }
+  .hero .eyebrow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px;
+    background: #fff; border: 1px solid var(--border);
+    color: var(--ink-2); font-size: 11.5px;
+  }
+  .pill.blue { background: var(--accent-soft); border-color: #cfe3f7; color: var(--accent); }
+  .pill.green { background: var(--ok-soft); border-color: #caecd5; color: var(--ok); }
+  .hero p.lead { color: var(--ink-2); font-size: 15px; margin-top: 10px; max-width: 720px; }
+  .hero-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+  .hero-card {
+    background: rgba(255, 255, 255, .78);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 12px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .hero-card strong { display: block; color: var(--ink); font-size: 13px; margin-bottom: 2px; }
+
+  section.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px 26px;
+    scroll-margin-top: 18px;
+  }
+  .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .section-head .kicker { color: var(--accent); font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .section-head h2 { margin-top: 2px; }
+  .section-head .anchor { color: var(--muted); font-size: 12px; white-space: nowrap; margin-top: 4px; }
+  .section-head .anchor:hover { color: var(--accent); }
+  .card h3 { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .card h3:first-of-type { margin-top: 8px; padding-top: 0; border-top: 0; }
+  .card h4 { margin-top: 16px; color: var(--ink); }
+
+  .lead-in { color: var(--ink-2); }
+  .callout {
+    margin-top: 14px; padding: 11px 13px;
+    border: 1px solid var(--border); border-left: 4px solid var(--accent);
+    border-radius: 8px; background: var(--surface-2);
+    color: var(--ink-2); font-size: 13px;
+  }
+  .callout strong { color: var(--ink); }
+  .callout.ok { border-left-color: var(--ok); background: var(--ok-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+  .callout p + p { margin-top: 6px; }
+
+  .steps { counter-reset: step; display: grid; gap: 10px; margin-top: 12px; }
+  .step {
+    position: relative;
+    padding: 12px 14px 12px 48px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  .step::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute; left: 13px; top: 12px;
+    width: 24px; height: 24px; border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--accent); color: #fff;
+    font-size: 12px; font-weight: 700;
+  }
+  .step strong { display: block; margin-bottom: 2px; }
+  .step p, .step ul { color: var(--ink-2); font-size: 13px; }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .mini {
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface-2); padding: 12px;
+    font-size: 13px; color: var(--ink-2);
+  }
+  .mini strong { display: block; color: var(--ink); margin-bottom: 3px; }
+
+  .table-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+
+  .schematic {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.6fr;
+    gap: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 11.5px;
+  }
+  .schematic > div { padding: 10px; min-height: 112px; border-right: 1px solid var(--border); }
+  .schematic > div:last-child { border-right: 0; }
+  .schematic b { display: block; font-size: 12.5px; margin-bottom: 5px; }
+  .schematic span { display: block; color: var(--muted); line-height: 1.55; }
+  .schematic .col-a { background: #f3f6fa; }
+  .schematic .col-b { background: #fbfcfe; }
+  .schematic .col-c { background: #fff; }
+
+  .faq details {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 0 13px;
+    margin-top: 9px;
+  }
+  .faq details[open] { background: var(--surface-2); }
+  .faq summary {
+    cursor: pointer;
+    padding: 11px 0;
+    font-weight: 600;
+    color: var(--ink);
+    list-style: none;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::before { content: "＋"; color: var(--accent); margin-right: 8px; font-weight: 700; }
+  .faq details[open] summary::before { content: "－"; }
+  .faq details > div { padding: 0 0 12px 24px; color: var(--ink-2); font-size: 13px; }
+
+  .quicklinks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .quicklinks a {
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 10px; background: #fff; color: var(--ink-2); font-size: 12px;
+  }
+  .quicklinks a:hover { border-color: #b9d4ee; color: var(--accent); text-decoration: none; }
+
+  footer.page {
+    color: var(--muted); font-size: 11.5px; text-align: center;
+    padding: 8px 10px 18px;
+  }
+  #to-top {
+    position: fixed; right: 20px; bottom: 20px;
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid var(--border-strong); background: #fff; color: var(--ink-2);
+    box-shadow: var(--shadow); cursor: pointer; display: none; font-size: 17px;
+  }
+  #to-top.show { display: block; }
+
+  @media (max-width: 980px) {
+    .shell { grid-template-columns: 1fr; margin-top: 12px; }
+    .side { position: static; max-height: none; }
+    .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .hero-grid { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .schematic { grid-template-columns: 1fr; }
+    .schematic > div { border-right: 0; border-bottom: 1px solid var(--border); min-height: auto; }
+    .schematic > div:last-child { border-bottom: 0; }
+  }
+  @media (max-width: 560px) {
+    .shell { width: calc(100% - 16px); }
+    section.card { padding: 18px 16px; }
+    .hero { padding: 21px 17px; }
+    h1 { font-size: 24px; }
+    h2 { font-size: 20px; }
+    .nav { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: #fff; font-size: 11.5pt; }
+    .shell { display: block; width: 100%; margin: 0; }
+    .side, #to-top, .quicklinks, .anchor { display: none !important; }
+    main { display: block; }
+    .hero, section.card { box-shadow: none; border-color: #ccc; break-inside: avoid; }
+    section.card { margin-top: 12px; }
+    a { color: var(--ink); text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#start">跳到教程正文</a>
+
+<div class="shell">
+  <aside class="side" aria-label="教程目录">
+    <div class="brand">
+      <div class="logo">
+        <!-- 品牌徽标：与客户端 exe、标题栏、关于页同一套 Z 图标（内联 SVG，离线可用） -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ZungMail">
+          <title>ZungMail</title>
+          <defs>
+            <linearGradient id="zmBg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+              <stop offset="0" stop-color="#6FB0FF"/>
+              <stop offset=".4" stop-color="#2F63F7"/>
+              <stop offset="1" stop-color="#2B18A6"/>
+            </linearGradient>
+            <radialGradient id="zmGlow" cx=".2" cy="0" r=".88">
+              <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+              <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+              <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="zmDepth" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+              <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+            </linearGradient>
+            <linearGradient id="zmLetter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+              <stop offset="0" stop-color="#FFFFFF"/>
+              <stop offset=".48" stop-color="#F8FBFF"/>
+              <stop offset="1" stop-color="#CFDDFA"/>
+            </linearGradient>
+            <clipPath id="zmClip"><rect width="512" height="512" rx="118"/></clipPath>
+          </defs>
+          <rect width="512" height="512" rx="118" fill="url(#zmBg)"/>
+          <rect width="512" height="512" rx="118" fill="url(#zmGlow)"/>
+          <g clip-path="url(#zmClip)">
+            <rect y="268" width="512" height="244" fill="url(#zmDepth)"/>
+          </g>
+          <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+            <path d="M172 166h165L172 344h165" fill="none" stroke="url(#zmLetter)" stroke-width="52"
+                  stroke-linejoin="bevel" stroke-linecap="round"/>
+          </g>
+          <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div>
+        <strong>ZungMail 使用教程</strong>
+        <small>离线内置版 · 货代邮件工作台</small>
+      </div>
+    </div>
+
+    <input id="nav-search" class="search" type="search" placeholder="筛选章节（Ctrl+K）" aria-label="筛选章节" />
+    <nav class="nav" id="toc">
+      <a href="#start"><span class="n">01</span>快速开始</a>
+      <a href="#account"><span class="n">02</span>账户与同步</a>
+      <a href="#interface"><span class="n">03</span>主界面导览</a>
+      <a href="#reading"><span class="n">04</span>阅读邮件</a>
+      <a href="#compose"><span class="n">05</span>写邮件</a>
+      <a href="#search"><span class="n">06</span>搜索与整理</a>
+      <a href="#organize"><span class="n">07</span>标签、规则与模板</a>
+      <a href="#freight"><span class="n">08</span>货代工作流</a>
+      <a href="#todo"><span class="n">09</span>待办、提醒与锁屏</a>
+      <a href="#data"><span class="n">10</span>数据与备份</a>
+      <a href="#settings"><span class="n">11</span>设置与升级</a>
+      <a href="#shortcuts"><span class="n">12</span>快捷键</a>
+      <a href="#faq"><span class="n">13</span>常见问题</a>
+    </nav>
+    <p class="nav-empty" id="nav-empty">没有匹配的章节</p>
+
+    <div class="side-foot">
+      教程随程序发布，不联网也能看。
+      <button type="button" onclick="window.print()">打印 / 导出 PDF</button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header class="hero">
+      <div class="eyebrow">
+        <span class="pill blue">ZungMail 个人版</span>
+        <span class="pill green">离线可读</span>
+        <span class="pill">更新于 2026-10-22</span>
+      </div>
+      <h1>从第一封邮件到按票跟进</h1>
+      <p class="lead">这份教程按真实操作顺序编写：先添加账户并完成同步，再认识三栏界面、阅读与写信，最后用标签、规则、时效节点和「一票货」把货代邮件工作流串起来。所有内容都在本机完成，不需要登录网页版帮助中心。</p>
+      <div class="hero-grid">
+        <div class="hero-card"><strong>第一次使用</strong>看第 1、2 章，5 分钟完成账户与收件箱配置。</div>
+        <div class="hero-card"><strong>日常收发</strong>看第 4、5 章，掌握阅读、附件、模板与草稿。</div>
+        <div class="hero-card"><strong>货代业务</strong>看第 7、8 章，按单号、时效和等待回复跟进。</div>
+      </div>
+      <div class="quicklinks" aria-label="快速跳转">
+        <a href="#account">添加账户</a>
+        <a href="#compose">写邮件</a>
+        <a href="#search">搜索语法</a>
+        <a href="#freight">时效节点</a>
+        <a href="#shortcuts">快捷键</a>
+        <a href="#faq">遇到问题</a>
+      </div>
+    </header>
+
+    <section class="card" id="start">
+      <div class="section-head">
+        <div><div class="kicker">Start here</div><h2>01 · 快速开始</h2></div>
+        <a class="anchor" href="#start">#</a>
+      </div>
+      <p class="lead-in">第一次打开 ZungMail 时，先完成三件事：添加邮箱账户、确认同步成功、设置一份签名。之后就可以在「统一收件箱」里处理邮件了。</p>
+
+      <div class="steps">
+        <div class="step">
+          <strong>打开设置 → 账户</strong>
+          <p>点主界面右上角的齿轮按钮，左侧选「账户」，再点「添加账户」。</p>
+        </div>
+        <div class="step">
+          <strong>填写邮箱地址与授权码</strong>
+          <p>QQ、163、企业邮箱通常使用「授权码」而不是网页登录密码。QQ 邮箱可在网页版「设置 → 账户 → POP3/IMAP/SMTP 服务」中开启 IMAP 并生成授权码。</p>
+        </div>
+        <div class="step">
+          <strong>测试连接并保存</strong>
+          <p>客户端会自动匹配常用服务商的 IMAP / SMTP 地址与端口。测试通过后保存账户，回到主界面等待首次增量同步。</p>
+        </div>
+        <div class="step">
+          <strong>从「统一收件箱」开始</strong>
+          <p>首次同步会先拉取邮件头，正文按设置里的「默认收取策略」按需下载；历史邮件很多时，列表会分页显示。</p>
+        </div>
+        <div class="step">
+          <strong>可选：设置签名</strong>
+          <p>设置 → 签名，为每个账户准备一份富文本签名；写信切换发件账户时会自动替换。</p>
+        </div>
+      </div>
+
+      <h3>账户右键菜单与收取策略</h3>
+      <ul>
+        <li>在左侧账户名上点右键：<strong>收取</strong>（只收这个账户）、<strong>新建文件夹</strong>（建在该账户根目录）、
+          <strong>整理文件夹</strong>（打开历史邮件清理，范围默认限定这个账户）、<strong>导入邮件</strong>（把 Foxmail / Outlook 导出的 .eml 导入）、
+          <strong>设置</strong>（直接打开这个账户的配置）。同步进行中或账户配置不完整时，「收取」会自动变灰。</li>
+        <li>在任意文件夹上点右键还可以「整理此文件夹」，清理窗口顶部会显示当前作用域，点旁边的「清除」恢复全账户范围。</li>
+        <li><strong>收取设置</strong>（设置 → 账户 → 编辑）：每个账户可单独选「完整收取（正文 + 附件）」「仅收取正文（附件按需下载）」「仅收取邮件头」，默认「继承默认策略」跟随设置 → 通用里的全局档位。</li>
+        <li>「仅收取正文」时附件不会自动下载：附件仍会列出来，右键选择「下载附件」即可（正文里内嵌的图片照常显示）。</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>首次同步较慢是正常的。</strong>
+        <p>同步进度在状态栏右侧；可以继续浏览已缓存的邮件。不要重复点刷新，客户端会复用正在进行的同步。</p>
+      </div>
+      <div class="callout">
+        <strong>数据在本机。</strong>
+        <p>邮件、索引、标签、规则与草稿都保存在本机数据目录（默认 <code>%APPDATA%\ZungMail</code>）；账户口令使用 Windows DPAPI（按当前用户派生密钥）加密，不上传第三方服务器。从旧版 MailClient 升级过来的用户不用手工搬数据：第一次启动会自动接管旧目录，详见第 10 章「从旧版 MailClient 升级：数据自动接管」。</p>
+      </div>
+    </section>
+
+    <section class="card" id="account">
+      <div class="section-head">
+        <div><div class="kicker">Account &amp; sync</div><h2>02 · 账户与同步</h2></div>
+        <a class="anchor" href="#account">#</a>
+      </div>
+      <p class="lead-in">账户页负责登录信息、服务器参数、标识色与启停状态。多个账户会同时出现在左侧文件夹树与「统一收件箱」中。</p>
+
+      <h3>添加与编辑账户</h3>
+      <ul>
+        <li>账户页右上或列表下方点「添加账户」；已有账户点「编辑」修改名称、邮箱、授权码、服务器与端口。</li>
+        <li>标识色只影响界面显示，用于快速区分账户；点击色块可从色盘选色，也可以直接选常用色。</li>
+        <li>保存前建议先「测试连接」，确认 IMAP 与 SMTP 都可达。若服务商要求 SSL，端口通常为 IMAP 993、SMTP 465。</li>
+        <li>停用账户后不会继续同步；停用前已缓存的邮件仍可阅读。</li>
+        <li>多账户时可以指定一个<strong>主账户</strong>（设置 → 账户 → 选中账户 →「设为主账户」）：一轮同步里它最先刷新，侧栏与账户列表也排在最前，其余账户自动作为副账户。第一个添加的账户默认就是主账户。</li>
+      </ul>
+
+      <h3>同步策略</h3>
+      <div class="grid-2">
+        <div class="mini"><strong>启动时自动增量同步</strong>打开客户端后自动检查新邮件；可在设置 → 通用关闭。</div>
+        <div class="mini"><strong>即时推送（IDLE）</strong>收件箱保持一条长连接，服务器一有新邮件立刻收下来（多数邮箱 1–3 秒）；服务器不支持推送时自动退回定时检查。</div>
+        <div class="mini"><strong>同步间隔</strong>定时检查的节拍（默认 1 分钟，可在设置 → 通用调整）：收件箱每拍都查，其余文件夹轮流扫，不会因为文件夹多而把间隔拖长。</div>
+        <div class="mini"><strong>正文下载</strong>可选择只保留邮件头、最近 7 / 30 / 90 天正文等档位；正文在阅读时按需下载。</div>
+        <div class="mini"><strong>手动刷新</strong>工具栏刷新按钮或 <kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>F5</kbd>，会把所有文件夹完整刷一遍。</div>
+        <div class="mini"><strong>只同步一个账户</strong>多账户时不必等整轮刷新：点账户行右侧的刷新图标，或右键账户选「立即同步此账户」，只收这个账户的邮件，状态栏会显示该账户的进度与结果。</div>
+        <div class="mini"><strong>后台收到新邮件</strong>列表与侧栏未读数会自动刷新，不用手动刷新或切换文件夹。</div>
+      </div>
+
+      <h3>本地优先与待同步</h3>
+      <p>标记已读、星标、移动、删除、打标签等操作会先在本机生效，再异步回写服务器。网络中断时，状态栏会显示「待同步 N 项」，恢复后自动重试；仍失败的操作会留在待同步队列，重启后继续尝试。</p>
+
+      <h3>文件夹</h3>
+      <ul>
+        <li>左侧「文件夹」区域右键可新建、重命名、删除自定义文件夹；只有空文件夹允许删除。</li>
+        <li>把邮件拖到文件夹，或用右键「移动到文件夹…」。移动<strong>本地立即生效</strong>：行会马上从当前列表消失，服务器回写在后台进行（状态栏先显示「正在后台同步服务器…」，完成后变成「已移动 N 封到「X」」）；这期间可以继续看信、搜信、切文件夹，不用等。</li>
+        <li>多选之后直接按住其中任意一封拖到文件夹，就会整批一次提交（只建一条连接、一条服务器指令，几十封也很快），不需要在拖动过程中一直按着 <kbd>Ctrl</kbd> / <kbd>Shift</kbd>；只是单击（没有拖动）时仍会像平常一样把选区收成这一封。</li>
+        <li>垃圾箱保留天数在设置 → 通用中调整；只有垃圾箱里的邮件才能永久删除，详见第 6 章。</li>
+      </ul>
+    </section>
+
+    <section class="card" id="interface">
+      <div class="section-head">
+        <div><div class="kicker">Workspace</div><h2>03 · 主界面导览</h2></div>
+        <a class="anchor" href="#interface">#</a>
+      </div>
+      <p class="lead-in">主界面固定为左中右三栏：左栏找位置，中栏选邮件，右栏读内容。启动时窗口会先显示加载占位，账户、列表和邮件头分阶段出现，不必等所有内容加载完才能操作。</p>
+
+      <div class="schematic" aria-label="主界面三栏示意">
+        <div class="col-a"><b>左栏 · 导航</b><span>快捷视图<br>等待回复<br>标签<br>时效节点 / 业务单号<br>账户与文件夹</span></div>
+        <div class="col-b"><b>中栏 · 列表</b><span>工具栏与搜索<br>全部 / 未读 / 星标<br>会话模式<br>邮件行与分页<br>批量处置条</span></div>
+        <div class="col-c"><b>右栏 · 阅读</b><span>邮件头与操作按钮<br>标签 / 业务信息 / 时效<br>正文与附件<br>上下文侧栏<br>邮件备注</span></div>
+      </div>
+
+      <h3>左栏</h3>
+      <ul>
+        <li><strong>快捷视图</strong>：统一收件箱、未读、星标、含附件、草稿箱。它们跨文件夹聚合，不改变服务器目录。</li>
+        <li><strong>等待回复</strong>：查看标记为「等待回复」的邮件和到点提醒，入口在货代功能开启时显示。</li>
+        <li><strong>标签</strong>：点击标签跨文件夹查看同一业务状态的邮件；可以为标签录制快捷键。</li>
+        <li><strong>时效节点 / 业务单号</strong>：货代功能开启后显示；点击节点或单号进入一票货视图。</li>
+        <li><strong>文件夹</strong>：每个账户下的真实 IMAP 文件夹；右键新建、重命名、删除。</li>
+      </ul>
+
+      <h3>中栏</h3>
+      <ul>
+        <li>工具栏提供写邮件、星标、删除、全部已读、筛选、会话模式、刷新与上下文侧栏开关。</li>
+        <li>点「刷新」后按钮上的箭头会变成转圈的加载弧（悬停提示也会变成「正在同步…」），同步结束自动恢复并刷新列表。</li>
+        <li>右侧的「上下文侧边栏」用一个分栏图标表示：面板打开时图标是主色、按钮带主色浅底，关闭时变灰，悬停提示直接写「已打开（点击隐藏）/ 已关闭（点击显示）」。</li>
+        <li>搜索框在工具栏中段（不再占用标题栏），支持普通关键词与结构化运算符；右侧箭头展开高级筛选条。</li>
+        <li>邮件行显示发件人、主题、摘要、时间、星标、附件、行业类型和业务单号徽标。</li>
+        <li>多选邮件后，底部整行切换为批量处置条：已读、星标、归档、删除、取消。</li>
+      </ul>
+
+      <h3>右栏</h3>
+      <ul>
+        <li>邮件头先显示，正文随后加载；正文下载中会显示「正在下载正文…」而不是空白。</li>
+        <li>标题下方可回复、回复全部、转发、切换已读、星标、删除、打印。已读邮件的切换按钮显示「信封 + 未读点」表示点了会标为未读，未读邮件则显示对勾（标为已读）。</li>
+        <li>右侧上下文侧栏显示同一发件人的往来邮件与附件；可用工具栏按钮隐藏。</li>
+        <li>邮件头里的<strong>收件人 / 抄送 / 密送</strong>都是一样的地址单元：鼠标悬停高亮，左键弹出联系人卡片（写邮件 / 相关邮件 / 复制地址），右键还有「在通讯录中查看」。</li>
+        <li>邮件备注仅保存在本机，不会发送给收件人。</li>
+      </ul>
+    </section>
+
+    <section class="card" id="reading">
+      <div class="section-head">
+        <div><div class="kicker">Read</div><h2>04 · 阅读邮件</h2></div>
+        <a class="anchor" href="#reading">#</a>
+      </div>
+      <p class="lead-in">单击邮件在右栏预览，双击在独立阅读窗口打开；阅读窗口沿用主界面主题，可用 <kbd>Esc</kbd> 关闭。</p>
+      <p>独立阅读窗口默认按当前主窗体宽高的 85% 居中打开（小屏会自动限制在工作区内），也可以拖动边框调整大小；关闭后再双击会重新按主窗体尺寸打开。</p>
+
+      <h3>阅读窗口里直接回信</h3>
+      <p>独立阅读窗口顶部有「回复 / 回复全部 / 转发」三个按钮，效果和主窗口一致：引用原文、带上签名、进入写信窗口。草稿邮件仍然不能回复或转发（双击草稿是继续编辑）。</p>
+
+      <h3>分段加载</h3>
+      <p>打开邮件时先读取本地邮件头（主题、发件人、收件人、附件名、业务单号），正文与附件按需下载。即使正文很大或需要联网，邮件头与操作按钮也会先出现。</p>
+
+      <h3>发件人与账户头像</h3>
+      <ul>
+        <li>默认显示首字母色块（同一地址颜色固定），用来快速区分发件人。</li>
+        <li>IMAP 服务器没有取头像或通讯录的接口，所以客户端会在启动约 20 秒后、闲下来时按邮箱地址查一次 Gravatar：查到就把首字母换成真实头像，查不到保持原样。一个运行周期只尝试一次，最多查最近往来的 300 个地址。</li>
+        <li>访问不到 Gravatar（国内网络经常超时）时会在连续几次失败后自动收手，不会反复重试、也不影响收发。</li>
+        <li>开关在 设置 → 通用 → 「空闲时加载联系人头像（Gravatar）」，关闭后完全不发这类请求。查询会把邮箱地址的 MD5 发给 gravatar.com。</li>
+      </ul>
+
+      <h3>陌生发件人（首次来信）</h3>
+      <ul>
+        <li>收信时客户端会判断这个发件人是不是「第一次来信」：通讯录里没有该地址、本地也从没收到过他的邮件，这封就会在列表发件人后面打一个琥珀色「陌生」小角标，阅读区顶部同时出现一条警告说明。</li>
+        <li>反过来，<strong>发件人域名就是你们公司自己的企业域名</strong>时（同事用新邮箱第一次来信）不算陌生——域名已经说明是自己人了；公共邮箱（qq.com、163.com 等）不适用这条豁免。</li>
+        <li>判定只在收信那一刻做一次：同一个人一次发来几封会一起标；下一轮再收到他的邮件就不再标了。已经收到的历史邮件不会追溯补标。</li>
+        <li>提醒你在意的是「改收款账号 / 付款指令 / 换代理」这类邮件：主题抄得再像，地址是新的就值得核实一遍。</li>
+        <li>确认对方没问题时，点阅读区提示条右侧的「加入通讯录」，以后他的来信就不会再被标为陌生（当前这封的标识保留，作为历史记录）。</li>
+        <li>不需要这个提醒可以在 设置 → 通用 →「标记陌生发件人」关闭；关闭只是不显示，判定结果仍留在本地库里，重新打开立刻恢复。</li>
+      </ul>
+
+      <h3>仿冒域名警示（疑似钓鱼）</h3>
+      <ul>
+        <li>钓鱼邮件最常用的手法是造一个和你自己公司域名几乎一样的域：把字母 l 换成 1、多写一个字母、换个后缀（<code>.cn</code> / <code>.net</code>），或者把你的域名夹在中间（<code>你的域名.别人的域</code>）。这类邮件的主题和正文能抄得一模一样，只有域名不对。</li>
+        <li>客户端会拿发件人域名和你本机账户的<strong>企业域名</strong>比：形近、混淆字符、只换后缀、被夹在对方域名里——命中任一条就在列表显示红色「疑似钓鱼」角标，阅读区（含独立阅读窗口）顶部出现红色警示条，写明它像哪个域名、因为哪一条规则。</li>
+        <li>红色警示比「陌生」的琥珀色更强，两者可以同时出现：既是从没来过信、域名又像你们公司，是最高风险的一类邮件。核实身份之前，不要按邮件里的账号付款或变更收款信息。</li>
+        <li><strong>公共邮箱域名不参与比较</strong>（qq.com、163.com、gmail.com、outlook.com 等）：这些域几十万人共用，拿来做相似度比只会误报，所以如果你只挂公共邮箱，就不会出现这类提示。</li>
+        <li>开关与容差在 设置 → 通用 → 「检测仿冒域名（钓鱼警示）」：默认「差 1 个字符」，可放宽到「差 2 个字符」，放宽更容易命中、也更容易误报。判定是即时计算的，改完设置回到列表立刻生效，历史邮件同样适用，不需要重新收信。</li>
+      </ul>
+
+      <h3>正文与远程图片</h3>
+      <ul>
+        <li>默认阻止远程图片，避免追踪像素；邮件中有远程图片时，正文上方会出现「显示图片」按钮。</li>
+        <li>正文由 WebView2 渲染，支持 HTML 邮件、内嵌图片、表格与长引用；多层引用的长线程默认保留最近 5 层直接显示，更早的收成「显示更早的历史邮件（N 层）」，点一下展开。</li>
+        <li>折叠的层数可以调：设置 → 通用里选「保留最近 5 / 6 … 10 层」；也可以整体关掉「默认折叠超长邮件的历史引用」，让长邮件直接铺开（缩进仍然会压平，不会越缩越窄）。</li>
+        <li>历史引用里的图片如果没跟着这封邮件一起传过来（常见于对方客户端只保留引用、不带图片），正文会在原位置留一个「图」字小方块（鼠标悬停有说明），不会出现一排破图、也不会把签名栏撑乱。</li>
+        <li>正文右上角的阅读工具栏可复制、打印；阅读字号跟随设置里的「字号」档位。</li>
+        <li>少数邮件可能只同步到了邮件头、正文是空的（上次下载被打断、解析失败或正文缓存被清）。这时正文区中间会出现<strong>「重新获取正文」</strong>按钮，点一下会再向服务器拉一次这封邮件的正文，成功后原地显示，不用重新同步整个文件夹。草稿不会出现这个按钮（草稿正文是本地内容）。</li>
+      </ul>
+
+      <h3>查看邮件源码</h3>
+      <ul>
+        <li>在邮件列表上右键 →「查看邮件源码」，或独立阅读窗口里右键邮件头（主题 / 发件人区域）→「查看邮件源码」，都能打开源码窗口。</li>
+        <li>窗口会<strong>优先连服务器取原始 MIME</strong>（相当于在 webmail 里看「显示原文」），能看到真实的 <code>Received</code>、<code>Reply-To</code>、<code>Authentication-Results</code> 与原始 MIME 分段，用来核对发件人是否为伪造、排查乱码最有价值。</li>
+        <li>断网、登录失败或服务器上已经没有这封邮件时，会退回<strong>本地重建版本</strong>（按客户端库里的字段重新拼一封），窗口顶部用琥珀色标明原因。两个版本都能另存为 <code>.eml</code>，Outlook / Foxmail 都能直接打开。</li>
+        <li>工具条：<strong>复制全部</strong>（整份源码进剪贴板）、<strong>另存为 .eml</strong>（原始字节原样保存）、<strong>重新获取</strong>（再连一次服务器）。源码超长（> 4 MB）时窗口只显示前 4 MB 并提示，另存仍然是完整内容。</li>
+        <li>查看源码是<strong>只读操作</strong>：不会把邮件标为已读、不改星标，也不写库。关闭窗口会自动取消还没取完的连接。</li>
+      </ul>
+
+      <h3>阅读收条</h3>
+      <p>发件人请求阅读收条时，邮件头下方会显示提示；可以选择「发送回执」或「忽略」。忽略不会记录为已发送，下次打开仍会提示。</p>
+
+      <h3>附件</h3>
+      <ul>
+        <li>普通附件显示在正文下方；内嵌图片归入正文资源，不单独列出。</li>
+        <li>双击附件用内置预览打开 PDF / 图片 / 文本；也可以保存、另存为或在资源管理器中定位。</li>
+        <li>附件预览窗口继承主界面的投影和标题栏，可调整大小。</li>
+      </ul>
+
+      <h3>阅读时顺手处理</h3>
+      <div class="grid-2">
+        <div class="mini"><strong>打标签</strong>右键邮件 →「打标签…」，可多选标签；批量选中后同样适用。</div>
+        <div class="mini"><strong>标记待办</strong>右键 →「标记待办…」，填写标题与截止时间；到期会在托盘提醒。</div>
+        <div class="mini"><strong>等待回复</strong>右键 →「等待回复…」，到点只提醒一次；可在跟进窗口继续 +4 小时或手动催信。</div>
+        <div class="mini"><strong>添加到黑白名单</strong>右键发件人可直接加入黑名单或白名单，规则在本地生效。</div>
+        <div class="mini"><strong>作为附件转发</strong>右键 →「作为附件转发」（或阅读工具栏的回形针按钮）：把整封原邮件打包成 .eml 附件发出去，正文不带引用，适合原样转给同事或客户核对。</div>
+        <div class="mini"><strong>查看邮件源码</strong>右键 →「查看邮件源码」：看服务器原始 MIME（含真实收发路径与安全认证头），可复制、可另存 .eml；断网时显示本地重建版本并标明原因。</div>
+      </div>
+
+      <div class="callout ok">
+        <strong>小技巧：</strong>按 <kbd>Ctrl</kbd>+<kbd>A</kbd> 全选当前页，再用底部批量条处理；按 <kbd>/</kbd> 可快速把焦点移到搜索框。
+      </div>
+    </section>
+
+    <section class="card" id="compose">
+      <div class="section-head">
+        <div><div class="kicker">Write</div><h2>05 · 写邮件</h2></div>
+        <a class="anchor" href="#compose">#</a>
+      </div>
+      <p class="lead-in">工具栏「写邮件」或 <kbd>Ctrl</kbd>+<kbd>N</kbd> 打开写信窗口。窗口支持最小化 / 最大化，默认按当前主窗体大小的 85% 打开并居中；小屏会自动限制在工作区内。</p>
+
+      <h3>收件人与正文</h3>
+      <ul>
+        <li>发件人下拉选择账户；收件人、抄送、密送支持从地址簿补全。点击「抄送 / 密送」展开对应行。</li>
+        <li>主题独立一行；正文使用富文本编辑器，支持加粗、颜色、字号、列表、表格、图片与链接。</li>
+        <li>右侧栏提供「快速文本 / 地址簿」：双击快速文本追加到光标处，双击联系人加入收件人。工具栏上的侧栏开关会记住上次的状态，下次写邮件自动沿用（第一次使用默认关闭）。</li>
+        <li>右上角模板按钮可套用整封模板（含主题、正文、内容块与占位符）。</li>
+      </ul>
+
+      <h3>签名</h3>
+      <p>每个账户一份签名。切换发件账户时，正文末尾的签名会实时替换；关闭该账户的「使用签名」后不再追加。签名由设置 → 签名维护。</p>
+      <ul>
+        <li><strong>导出 / 导入</strong>：设置 → 签名下方有「导出…」「导入…」。导出生成一份 JSON（按邮箱地址记录每个账户的签名），换机器或给同事时导入即可；导入按邮箱地址匹配本地账户，命中的会覆盖该账户现有签名，本机没有的邮箱会列出来跳过。</li>
+      </ul>
+
+      <h3>附件与定时发送</h3>
+      <ul>
+        <li>点附件按钮选择文件；附件仅保存路径，发送时再读取。编辑器里也能插入附件标识。</li>
+        <li>「定时发送」可填写 <code>HH:mm</code>，或用「延迟 1 分钟 / 延迟 30 分钟 / 明早 9 点」快捷设置；到点由发件箱后台投递。</li>
+        <li>定时发送的邮件在发件箱中可见，可立即投递、重试或删除。</li>
+      </ul>
+
+      <h3>草稿与自动保存</h3>
+      <ul>
+        <li>写信内容每 30 秒自动保存到本机；关闭窗口时若有未保存内容，会询问保存、放弃或取消关闭。</li>
+        <li>「保存草稿 / <kbd>Ctrl</kbd>+<kbd>S</kbd>」会把草稿同时写入本机恢复文件和草稿箱；草稿箱中的草稿双击可继续编辑。</li>
+        <li>如果上次异常退出，下次打开写信窗口会提示恢复未发送草稿；附件被移动或删除时会标出缺失文件。</li>
+        <li>草稿邮件不能直接回复或转发，避免把未发送内容带进新邮件。</li>
+      </ul>
+
+      <h3>发送前检查</h3>
+      <p>点发送时会检查漏附件、空主题等常见问题；提示只提醒不强制阻断，确认后可以继续发送。发送成功后草稿会自动清理。</p>
+
+      <div class="callout">
+        <strong>回复与转发：</strong>在右栏邮件头使用「回复 / 回复全部 / 转发」。草稿邮件会禁用这三个操作；转发会保留原邮件正文与附件信息。
+      </div>
+    </section>
+
+    <section class="card" id="search">
+      <div class="section-head">
+        <div><div class="kicker">Find &amp; clean</div><h2>06 · 搜索与整理</h2></div>
+        <a class="anchor" href="#search">#</a>
+      </div>
+      <p class="lead-in">搜索框支持普通关键词与结构化运算符，多个条件按「与」组合；识别不了的运算符会保留为普通文本，避免搜不到。</p>
+
+      <h3>输入 @ 选择语法</h3>
+      <p>不用背运算符：在搜索框输入半角 <kbd>@</kbd> 或全角 <kbd>＠</kbd>，会弹出类似微信 @ 好友的语法菜单。继续输入可以过滤，例如 <code>@附件</code> 只剩「附件名 / 含附件」两项。</p>
+      <ul>
+        <li>菜单共 22 条，按「收件人 / 内容 / 状态 / 时间 / 货代单号 / 邮件类型」分组，每项都带中文说明和示例。</li>
+        <li>方向键或 <kbd>PageUp</kbd> / <kbd>PageDown</kbd> 移动，<kbd>Enter</kbd> 或 <kbd>Tab</kbd> 插入；鼠标悬停选中、单击插入。</li>
+        <li>插入 <code>from:</code>、<code>booking:</code> 等需要填值的语法时光标停在冒号后；<code>has:attachment</code>、<code>is:unread</code> 等完整语法会自动补空格。</li>
+        <li><kbd>Esc</kbd> 只收起菜单、保留已输入的搜索词；再按一次 <kbd>Esc</kbd> 才清空搜索。</li>
+        <li>触发符必须在开头或空白之后；邮箱地址里的 <code>@</code> 不会误弹菜单。</li>
+      </ul>
+      <div class="callout">
+        <strong>组合使用：</strong>先输入普通关键词，再输入 <kbd>@</kbd> 选择运算符，例如 <code>放舱 @from:</code> 后继续输入发件人。多个条件之间仍是「与」关系。
+      </div>
+
+      <h3>常用搜索语法</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>写法</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><code>booking:SO123</code></td><td>按订舱号 / SO 搜索业务单号</td></tr>
+            <tr><td><code>bl:HBL123</code> / <code>ctr:ABCD1234567</code></td><td>按提单号 / 箱号搜索</td></tr>
+            <tr><td><code>ref:ABC</code></td><td>任意类型的业务单号</td></tr>
+            <tr><td><code>from:ops@example.com</code></td><td>按发件人</td></tr>
+            <tr><td><code>subject:"放舱通知"</code></td><td>按主题（含空格时加引号）</td></tr>
+            <tr><td><code>filename:SI</code></td><td>按附件名</td></tr>
+            <tr><td><code>has:attachment</code></td><td>只看含附件邮件</td></tr>
+            <tr><td><code>is:unread</code> / <code>is:starred</code></td><td>未读 / 星标</td></tr>
+            <tr><td><code>type:si</code></td><td>按行业邮件类型</td></tr>
+            <tr><td><code>after:7d</code> / <code>before:2026-10-01</code></td><td>时间范围</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>搜索结果与文件夹列表分开</h3>
+      <p>在搜索框输入内容后按 <kbd>Enter</kbd> 才进入搜索结果；之后点击左侧文件夹会直接回到该文件夹的普通邮件列表，搜索框文字保留。想再看刚才的搜索结果，再按一次 <kbd>Enter</kbd> 即可，不需要重新输入。</p>
+      <ul>
+        <li>搜索结果顶部有「当前文件夹 / 所有邮件」两个范围：当前文件夹只查左侧选中的文件夹 / 快捷视图 / 标签，所有邮件跨账户、跨文件夹聚合。</li>
+        <li>切换范围会重新查询并更新列表数量；「所有邮件」默认排除垃圾箱。</li>
+        <li>只有搜索结果模式才显示搜索条件胶囊；点搜索框右侧 <kbd>×</kbd> 会同时清空条件并回到文件夹列表。</li>
+      </ul>
+
+      <h3>全部搜索条件（对齐 Foxmail）</h3>
+      <p>搜索框右侧箭头展开「全部搜索条件」面板，条件与 Foxmail 的搜索面板一一对应：</p>
+      <ul>
+        <li><strong>发件人 / 收件人 / 主题 / 全文</strong>四个文本框：收件人一栏同时查收件人、抄送与密送；全文查正文纯文本。</li>
+        <li><strong>附件</strong>可选「不限 / 有附件 / 无附件」，右侧再填附件名关键词；<strong>标签</strong>可选「不限 / 有标签 / 无标签 / 某个标签」；<strong>提醒</strong>可选「不限 / 有提醒 / 无提醒」（提醒指进行中的等待回复或未完成待办）；<strong>备注</strong>在本地备注里查。</li>
+        <li><strong>时间</strong>：时间不限 / 今天 / 三天内 / 一周内 / 一个月内 / 一年内 / 自定义（选自定义后出现起止日期）。</li>
+        <li>条件之间是「与」关系，可以和搜索框里的 <code>booking:</code>、自由关键词叠加；字段值可以直接从邮件正文复制粘贴；<kbd>Enter</kbd> 应用，<kbd>Esc</kbd> 收起，<strong>重置</strong>清空全部条件。</li>
+        <li>面板右上角的 <strong>+</strong> 可以勾选要显示哪些条件（发件人 / 收件人 / 主题 / 全文 / 附件 / 标签 / 提醒 / 备注 / 时间），已勾选的条件前有 <strong>✓</strong>；取消勾选的条件会从面板上收起，其余条件自动重排。选择会记进设置，下次启动保持。</li>
+      </ul>
+
+      <h3>多选与批量</h3>
+      <ul>
+        <li><kbd>Ctrl</kbd>+单击或 <kbd>Shift</kbd>+单击多选；勾选后底部出现批量条。</li>
+        <li>批量已读、星标、归档、删除只影响选中邮件；批量操作先本地生效，再异步回写服务器。</li>
+        <li>取消批量选择后，底部恢复分页条。</li>
+      </ul>
+
+      <h3>垃圾箱与永久删除</h3>
+      <div class="callout danger">
+        <strong>永久删除不可撤销。</strong>
+        <p>普通「删除」只是移动到垃圾箱；只有垃圾箱里的邮件才提供永久删除。永久删除会先尝试服务器 <code>\Deleted</code> + UID EXPUNGE，成功后再删除本地记录；操作前会二次确认。</p>
+      </div>
+    </section>
+
+    <section class="card" id="organize">
+      <div class="section-head">
+        <div><div class="kicker">Organize</div><h2>07 · 标签、规则与模板</h2></div>
+        <a class="anchor" href="#organize">#</a>
+      </div>
+
+      <h3>标签</h3>
+      <ul>
+        <li>设置 → 标签：新建标签、选颜色、录制快捷键。标签是本地业务状态，不写入服务器。</li>
+        <li>点击快捷键框后直接按组合键即可录制；按 <kbd>Backspace</kbd> / <kbd>Delete</kbd> 或点框内 <kbd>✕</kbd> 解绑。</li>
+        <li>快捷键只在主窗口生效，输入文字时不会触发；重复组合键会被拒绝。</li>
+        <li>邮件右键「打标签…」可多选；批量选中邮件后同样适用。</li>
+      </ul>
+
+      <h3>规则</h3>
+      <ul>
+        <li>条件支持「发件人包含 / 发件域包含 / 主题包含」，多个条件为「与」关系。</li>
+        <li>动作可叠加：星标、已读、打标签、移动到文件夹、归档、标记垃圾邮件；移动 / 归档 / 垃圾会终止后续规则。</li>
+        <li>勾选「命中后继续执行后续规则」可让多条规则依次生效。</li>
+        <li>规则默认只处理同步新入库的邮件；选中规则后点「对已有邮件执行一次」可补跑（Inbox 最近 500 封 / 全文件夹 2000 封）。</li>
+      </ul>
+
+      <h3>模板与快速文本</h3>
+      <div class="grid-2">
+        <div class="mini"><strong>整封模板</strong>可保存主题、富文本正文、分组、内容块与占位符；写信时从模板按钮套用。</div>
+        <div class="mini"><strong>快速文本</strong>纯文本话术，原样追加到光标处，不覆盖已写内容；适合报价、催款、标准回复。</div>
+      </div>
+      <p>两者都在设置 → 模板维护，分为「邮件模板 / 快速文本」两个 Tab；支持导入 / 导出 JSON，便于同事之间共享。占位符如 <code>{主题}</code>、<code>{日期}</code>、<code>{客户名称}</code> 会在套用时替换。</p>
+
+      <h3>签名</h3>
+      <p>设置 → 签名按账户维护富文本签名，支持加粗、颜色、字号与图片。签名只在写信时追加，不会重复插入已有正文。</p>
+    </section>
+
+    <section class="card" id="freight">
+      <div class="section-head">
+        <div><div class="kicker">Freight workflow</div><h2>08 · 货代工作流</h2></div>
+        <a class="anchor" href="#freight">#</a>
+      </div>
+      <p class="lead-in">设置 → 货代有总开关与四个子项：业务编号、行业邮件类型、时效节点、等待回复。不做货代业务时可以整体关闭，界面会回到通用邮箱形态。</p>
+
+      <h3>业务编号</h3>
+      <p>从主题与正文抽取 Job / SO / B/L / 箱号 / 封号 / 船名航次 / 港口 / 发票号 / PO / 空运单等标识。邮件头显示业务卡片，左栏按单号聚合，搜索支持 <code>booking:</code>、<code>bl:</code>、<code>ctr:</code> 等运算符。</p>
+
+      <h3>行业邮件类型</h3>
+      <p>按主题与正文关键词识别订舱确认、SI、VGM、提单草稿、AN、账单、查验、甩柜、延误等类型。邮件头显示类型标签，搜索可用 <code>type:si</code> 等关键字。</p>
+
+      <h3>时效节点与一票货</h3>
+      <ul>
+        <li>识别截关、截补料、VGM、单证、ETD、ETA 等节点，左栏按时倒计时；点击节点进入对应的一票货案件。</li>
+        <li>案件页把同一票货的邮件、附件与时间轴聚在一起，可导出资料包。</li>
+        <li>邮件头「查看一票货」按钮也能进入案件；搜索业务单号可跨文件夹找回相关邮件。</li>
+      </ul>
+
+      <h3>等待回复</h3>
+      <ul>
+        <li>右键邮件「等待回复…」设置跟进时间；到点只托盘提醒一次，避免反复打扰。</li>
+        <li>在「等待回复」窗口可以继续跟进（+4 小时）或手动催信；客户端不会自动替用户发催信邮件。</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>关闭功能不会删数据。</strong>
+        <p>关闭货代子项只影响之后入库的识别与界面入口；已识别的数据保留，重新开启后会自动补扫这段时间的邮件。</p>
+      </div>
+    </section>
+
+    <section class="card" id="todo">
+      <div class="section-head">
+        <div><div class="kicker">Reminders</div><h2>09 · 待办、提醒与锁屏</h2></div>
+        <a class="anchor" href="#todo">#</a>
+      </div>
+
+      <h3>待办</h3>
+      <p>邮件右键「标记待办…」填写标题与截止时间。待办只保存在本机；到期未完成时托盘弹出提醒，已提醒的待办不会重复弹。完成的待办会归档，可在待办列表查看逾期状态。</p>
+
+      <h3>托盘与全局热键</h3>
+      <ul>
+        <li>默认关闭主窗口时最小化到托盘，后台同步、定时发送与提醒继续运行；可在设置 → 通用改为直接退出。</li>
+        <li>托盘右键菜单可以显示主窗口、检查新邮件、退出。</li>
+        <li>设置 → 通用 → 全局热键可注册系统级组合键：主界面在前台时隐藏到托盘，否则从任意程序切回主界面。</li>
+        <li>设置 → 通用 → 诊断与日志：运行日志写在数据目录的 <code>logs</code> 下，按天一个文件，<strong>最多保留最近 7 天</strong>（可选 1 / 3 / 5 / 7 天），超期的在程序运行期间自动删除；那里也能看到当前占用，并手动清理一次。</li>
+      </ul>
+
+      <h3>客户端锁屏</h3>
+      <ul>
+        <li>设置 → 通用 → 安全：设置锁定密码后可启用客户端锁定；锁定状态下必须输入密码才能查看邮件。</li>
+        <li>可设置空闲多久自动锁定；解锁密码框获得焦点时，窗口级快捷键会被屏蔽。</li>
+        <li>锁定只保护界面访问，不改变本机数据库文件；共用电脑时仍建议使用 Windows 账户隔离。</li>
+      </ul>
+    </section>
+
+    <section class="card" id="data">
+      <div class="section-head">
+        <div><div class="kicker">Data</div><h2>10 · 数据与备份</h2></div>
+        <a class="anchor" href="#data">#</a>
+      </div>
+
+      <h3>数据在哪里</h3>
+      <p>设置 → 数据 / 存储与清理可以看到当前数据目录。默认在 <code>%APPDATA%\ZungMail</code>：数据库 <code>mail.db</code>、原始邮件 <code>eml\</code>、运行日志 <code>logs\</code>、设置与模板 <code>settings.json</code> / <code>templates.json</code>、头像缓存 <code>avatars\</code> 都在这个目录里，目录位置记在 <code>location.json</code> 中。另外 <code>%LOCALAPPDATA%\ZungMail</code> 只放可以丢弃的缓存（<code>WebView2\</code> 渲染缓存与升级下载的 <code>updates\</code>），删掉会自动重建，不影响邮件。全部邮件保存在本机 SQLite（WAL + FTS5 全文索引），不依赖云端。</p>
+
+      <h3>自定义数据目录</h3>
+      <p>设置 → 数据可选择新的数据保存目录。选择后不会立刻复制，而是写入指针，下次启动时迁移；旧目录会保留作备份。不要选择网络盘或同步盘，避免数据库锁与损坏。</p>
+
+      <h3>从旧版 MailClient 升级：数据自动接管</h3>
+      <p>1.2.0 起软件改名为 <strong>ZungMail</strong>，数据目录也随之从 <code>%APPDATA%\MailClient</code> 换成 <code>%APPDATA%\ZungMail</code>。第一次启动 ZungMail 时会<strong>自动接管旧数据，不需要手工搬文件夹</strong>：</p>
+      <ul>
+        <li>旧数据在默认位置 <code>%APPDATA%\MailClient</code>：直接把整个目录改名成 <code>%APPDATA%\ZungMail</code>。同一个盘符下改名是秒级的，不复制文件、不额外占空间。</li>
+        <li>旧数据放在自定义目录（以前在设置 → 数据里改过位置）：只把 <code>location.json</code> 指针改成原目录，文件原地不动。</li>
+        <li>接管失败时（旧目录被占用、权限不足）客户端不再搬动文件，而是把数据目录直接指到旧的 <code>%APPDATA%\MailClient</code>「原地接管」，邮箱照常打开、数据一条不少。想把它挪到新路径：彻底退出 ZungMail（含托盘）后删掉 <code>%APPDATA%\ZungMail</code> 里只剩指针的文件，再把 <code>%APPDATA%\MailClient</code> 改名成 <code>%APPDATA%\ZungMail</code>，然后重新启动。</li>
+      </ul>
+      <div class="callout">
+        <strong>接管过程不删除用户邮件。</strong>
+        <p>它只改目录名或指针，账户、邮件、标签、规则、模板与签名都原样带过来。想确认是否接管成功：设置 → 数据里显示的数据目录应当是 <code>%APPDATA%\ZungMail</code>，并且账户数、邮件数与升级前一致。</p>
+      </div>
+
+      <h3>导入与导出</h3>
+      <div class="grid-2">
+        <div class="mini"><strong>导入 .eml</strong>把 Foxmail / Outlook 导出的 .eml 批量导入指定账户与文件夹，按 Message-ID 去重。</div>
+        <div class="mini"><strong>导出 ZIP</strong>把数据库与 .eml 原始邮件目录打包，便于本机备份或迁移。</div>
+        <div class="mini"><strong>联系人</strong>支持 vCard（.vcf）与 CSV 导入导出；通讯录列表按每页 50 位分页，顶部搜索框可按姓名或邮箱即时过滤（<kbd>Esc</kbd> 清空）。</div>
+        <div class="mini"><strong>缓存清理</strong>清理正文缓存只删正文与附件缓存，邮件头保留；阅读时重新下载。重建搜索索引用于修复搜索不到邮件。</div>
+      </div>
+
+      <h3>卸载与数据保留</h3>
+      <p>卸载程序都会先删除安装目录（默认 <code>C:\Program Files\ZungMail</code>），数据目录默认<strong>不动</strong>：MSI 安装包只移除程序文件与快捷方式；NSIS 安装包（<code>setup.exe</code>）还会多问一次是否同时删除 <code>%APPDATA%\ZungMail</code> 与 <code>%LOCALAPPDATA%\ZungMail</code>，选「否」就保留邮件、账户、标签、规则与模板，重新安装后继续使用。</p>
+
+      <div class="callout danger">
+        <strong>这些操作不可撤销：</strong>永久删除垃圾箱邮件、清理正文缓存、重建索引、卸载时选择删除数据。执行前确认已经备份需要的邮件与附件。
+      </div>
+    </section>
+
+    <section class="card" id="settings">
+      <div class="section-head">
+        <div><div class="kicker">Settings &amp; update</div><h2>11 · 设置与升级</h2></div>
+        <a class="anchor" href="#settings">#</a>
+      </div>
+
+      <h3>常用设置</h3>
+      <ul>
+        <li><strong>外观</strong>：默认 / 淡蓝 / 淡粉 / 淡橙四套浅色主题，选中即时预览，点「保存设置」长期生效。</li>
+        <li><strong>字号</strong>：紧凑 / 标准 / 较大，同时影响列表与正文阅读字号。</li>
+        <li><strong>分页大小</strong>：列表始终分页加载，可调整每页封数。</li>
+        <li><strong>正文下载</strong>：控制历史邮件正文与附件的下载范围，节省磁盘与流量。</li>
+        <li><strong>客户端锁定</strong>：设置密码与空闲自动锁定时间。</li>
+      </ul>
+
+      <h3>在线升级</h3>
+      <ol>
+        <li>设置 → 升级填写升级服务根地址（域名、IP 或完整 URL，可带端口与路径前缀）。</li>
+        <li>可设置启动后自动检测的延迟；也可以随时点「立即检测」。</li>
+        <li>发现新版本时状态栏出现版本标识，打开升级窗口可查看更新说明、大小与发布时间。</li>
+        <li>点「下载」后显示进度并允许取消；下载完成会校验 SHA256 与文件大小，再进入「待安装」。</li>
+        <li>「立即安装」会先保存设置与草稿，再启动安装程序并退出客户端；装好后客户端会自动重新打开，覆盖安装不会删除数据目录。</li>
+        <li>如果这一版发布的是<span class="kbd">便携版 zip</span>，升级窗口不会出现「立即安装」：按钮是「下载并打开文件夹」，下载完解压覆盖程序目录即可（覆盖前先退出客户端，写 <code>Program Files</code> 需要管理员权限）。</li>
+        <li>从旧版 MailClient（1.1.x）升级到 ZungMail 1.2.0 是<strong>原地升级</strong>：安装包沿用同一个升级标识，不需要先卸载旧版。装完旧程序文件被移除，安装目录变成 <code>C:\Program Files\ZungMail</code>；数据目录由客户端在下次启动时自动接管（见第 10 章），邮件与设置都不动。</li>
+      </ol>
+      <div class="callout">
+        <strong>没有配置升级服务？</strong>
+        <p>客户端不会发起网络请求，状态显示「未配置升级服务」。这不影响收发邮件；需要使用在线升级时再填写地址。</p>
+      </div>
+    </section>
+
+    <section class="card" id="shortcuts">
+      <div class="section-head">
+        <div><div class="kicker">Keyboard</div><h2>12 · 快捷键</h2></div>
+        <a class="anchor" href="#shortcuts">#</a>
+      </div>
+      <p class="lead-in">窗口级快捷键在输入文字、富文本编辑或搜索框获得焦点时会让位给原生编辑行为。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>快捷键</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>写邮件</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd> / <kbd>F5</kbd></td><td>刷新 / 增量同步</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>聚焦搜索框</td></tr>
+            <tr><td><kbd>/</kbd></td><td>聚焦搜索框（不在输入框时）</td></tr>
+            <tr><td><kbd>Delete</kbd></td><td>删除选中邮件（移到垃圾箱）</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>全选当前页邮件</td></tr>
+            <tr><td><kbd>@</kbd> / <kbd>＠</kbd></td><td>在搜索框唤起语法菜单</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>先收起 @ 语法菜单，再按一次清空搜索；独立阅读窗口关闭；筛选条收起</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>写信窗口保存草稿</td></tr>
+            <tr><td>自定义组合键</td><td>设置 → 标签中录制，跳转到对应标签视图</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>标签快捷键：</strong>点击标签的快捷键框后按下例如 <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd>，保存后即可在邮件列表使用；不需要 Ctrl+数字。
+      </div>
+    </section>
+
+    <section class="card faq" id="faq">
+      <div class="section-head">
+        <div><div class="kicker">Troubleshooting</div><h2>13 · 常见问题</h2></div>
+        <a class="anchor" href="#faq">#</a>
+      </div>
+
+      <details>
+        <summary>QQ 邮箱提示登录失败，怎么办？</summary>
+        <div>QQ 邮箱不能直接用网页登录密码。请在 QQ 邮箱网页版「设置 → 账户」开启 IMAP/SMTP 服务并生成授权码，把授权码填到客户端的密码框。若之前关闭过服务，重新开启后可能需要等待几分钟生效。</div>
+      </details>
+
+      <details>
+        <summary>一直显示「正在同步」或收不到新邮件？</summary>
+        <div>先看状态栏的同步进度与错误提示。检查网络、IMAP 服务是否开启、授权码是否过期；企业邮箱可能需要管理员允许 IMAP 登录。确认后点刷新按钮重试，客户端会复用正在进行的同步，不会重复建连接。</div>
+      </details>
+
+      <details>
+        <summary>正文是空白的 / 图片不显示？</summary>
+        <div>正文按需下载，先等状态栏或正文区的「正在下载正文…」结束。远程图片默认被阻止，点正文上方的「显示图片」放行。若仍为空白，检查 WebView2 运行时是否安装，或在设置里尝试关闭 HTML 渲染后重新打开邮件。</div>
+      </details>
+
+      <details>
+        <summary>搜索不到明明存在的邮件？</summary>
+        <div>先确认搜索的是本地已同步的文件夹；历史邮件可能只保留了邮件头，需要先同步。记不住运算符时，在搜索框输入 <kbd>@</kbd> 从菜单里选，比手打更不容易拼错；也可以改用高级筛选条。搜索索引异常时，到设置 → 数据点「重建搜索索引」。</div>
+      </details>
+
+      <details>
+        <summary>标签快捷键为什么没有反应？</summary>
+        <div>标签快捷键只在主窗口、且焦点不在输入框 / 正文编辑器时生效。检查快捷键是否与其它标签重复；录制后需要点「保存标签」。如果组合键被其它程序占用，换一个组合键即可。</div>
+      </details>
+
+      <details>
+        <summary>升级服务检测失败怎么办？</summary>
+        <div>先确认设置 → 升级里的地址能访问，且服务端已发布高于当前版本的安装包。错误提示会区分未配置、地址不合法、无法连接和校验失败；校验失败时安装包会被删除，重新下载即可。</div>
+      </details>
+
+      <details>
+        <summary>从旧版 MailClient 升级过来，邮件和设置还在吗？怎么确认？</summary>
+        <div>默认都在，升级不删数据。第一次启动 ZungMail 会把旧数据目录自动接管到 <code>%APPDATA%\ZungMail</code>（以前改过自定义目录的只改指针、文件原地不动）；接管遇到占用或权限问题时，客户端原地继续用旧目录，保证能打开邮箱，不会丢邮件。确认方法：设置 → 数据里的数据目录应当是 <code>%APPDATA%\ZungMail</code>，账户数、邮件总数、标签与规则数量与升级前一致；标题栏显示 <code>ZungMail v1.2.0</code> 说明装的是新版。详见第 10 章「从旧版 MailClient 升级：数据自动接管」。</div>
+      </details>
+
+      <details>
+        <summary>怎么看一封邮件的原始源码？</summary>
+        <div>在邮件列表上右键 →「查看邮件源码」（独立阅读窗口里右键邮件头也可以）。窗口优先连服务器取原始 MIME，能看到 <code>Received</code>、<code>Authentication-Results</code> 等真实头部；断网或服务器上已没有这封邮件时，会退回本地重建版本，顶部用琥珀色说明原因。需要留档时点「另存为 .eml」，保存的是原始字节，Outlook / Foxmail 都能直接打开。查看源码不会把邮件标为已读。</div>
+      </details>
+
+      <details>
+        <summary>重装 / 升级会丢邮件吗？</summary>
+        <div>覆盖安装与在线升级不会删除数据目录。卸载时 MSI 只删程序文件与快捷方式；NSIS <code>setup.exe</code> 会问是否删除 <code>%APPDATA%\ZungMail</code> 与 <code>%LOCALAPPDATA%\ZungMail</code>，选保留后重新安装可继续使用。重要邮件建议先在设置 → 数据导出 ZIP 备份。</div>
+      </details>
+
+      <details>
+        <summary>安装时提示「警告 1909：无法创建快捷方式 ZungMail.lnk」或装完找不到 ZungMail.exe 怎么办？</summary>
+        <div>
+          这类提示大多是<strong>同一个原因</strong>：电脑上的 360 安全卫士 / 360 天擎、火绒、腾讯电脑管家等把刚解压出来的 <code>ZungMail.exe</code> 当成可疑程序<strong>隔离（删除）</strong>了。主程序没了，安装器建快捷方式时自然指向不到文件，于是弹出 1909。<br />
+          按这个顺序处理：
+          <ol>
+            <li>打开安全软件的「隔离区 / 恢复区」，把 ZungMail.exe 恢复，并加入<strong>信任区</strong>；360 安全卫士是「木马查杀 → 恢复区 → 恢复并信任」，再把整个安装目录（默认 <code>C:\Program Files\ZungMail</code>）加进「信任区」。</li>
+            <li>企业里装了 360 天擎 / 火绒企业版的，让管理员把 ZungMail 加进「软件白名单 / 信任目录」后重新下发。</li>
+            <li>加白之后<strong>重新运行一次安装包</strong>（覆盖安装即可，不需要先卸载）。</li>
+            <li>如果安装包本身被拦（双击就消失），同样把安装包加入信任后再运行；或改用 <code>ZungMail-&lt;版本&gt;-x64.msi</code>。</li>
+          </ol>
+          临时应急：程序已经装好但没有桌面图标时，打开 ZungMail → 设置 → 关于 → 「创建桌面快捷方式」即可补一个（不需要重装）；主程序被删掉时这个按钮也救不了，必须先加白再重装。<br />
+          另一类少见情况是「公共桌面」<code>C:\Users\Public\Desktop</code> 被清理工具删掉导致快捷方式建不出来，重建该目录或按上面的按钮补图标即可。
+        </div>
+      </details>
+
+      <details>
+        <summary>如何把教程带走或打印？</summary>
+        <div>本文件就是完整的离线教程，可直接复制安装目录下的 <code>Assets\help\user-guide.html</code>。在浏览器中按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 或点左侧「打印 / 导出 PDF」即可保存为 PDF。</div>
+      </details>
+
+      <div class="callout ok">
+        <strong>版本与许可：</strong>设置 → 关于可以查看客户端版本、数据目录与第三方开源许可；升级服务部署与接口说明由管理员单独维护。
+      </div>
+    </section>
+
+    <footer class="page">ZungMail 使用教程 · 随程序发布的离线 HTML · 更新于 2026-10-22</footer>
+  </main>
+</div>
+
+<button id="to-top" type="button" aria-label="回到顶部" title="回到顶部">↑</button>
+
+<script>
+(() => {
+  'use strict';
+  const toc = document.getElementById('toc');
+  const links = Array.from(toc.querySelectorAll('a'));
+  const search = document.getElementById('nav-search');
+  const empty = document.getElementById('nav-empty');
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+  function filterNav() {
+    const q = (search.value || '').trim().toLowerCase();
+    let shown = 0;
+    links.forEach(a => {
+      const hit = !q || a.textContent.toLowerCase().includes(q);
+      a.style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    });
+    empty.style.display = shown === 0 ? 'block' : 'none';
+  }
+  search.addEventListener('input', filterNav);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      search.focus();
+    }
+  });
+
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        links.forEach(a => a.classList.remove('active'));
+        byId.get(entry.target.id)?.classList.add('active');
+      });
+    }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+    sections.forEach(section => observer.observe(section));
+  }
+
+  const top = document.getElementById('to-top');
+  window.addEventListener('scroll', () => top.classList.toggle('show', window.scrollY > 700), { passive: true });
+  top.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+})();
+</script>
+</body>
+</html>
+
+

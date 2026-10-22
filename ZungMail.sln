@@ -1,0 +1,85 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35013.160
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZungMail.Application", "src\ZungMail.Application\ZungMail.Application.csproj", "{1A1B2C3D-0006-4000-8000-000000000006}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZungMail.Core", "src\ZungMail.Core\ZungMail.Core.csproj", "{1A1B2C3D-0001-4000-8000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZungMail.Infrastructure", "src\ZungMail.Infrastructure\ZungMail.Infrastructure.csproj", "{1A1B2C3D-0002-4000-8000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZungMail.Mail", "src\ZungMail.Mail\ZungMail.Mail.csproj", "{1A1B2C3D-0003-4000-8000-000000000003}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZungMail.App", "src\ZungMail.App\ZungMail.App.csproj", "{1A1B2C3D-0004-4000-8000-000000000004}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZungMail.Tests", "tests\ZungMail.Tests\ZungMail.Tests.csproj", "{1A1B2C3D-0005-4000-8000-000000000005}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{25F34D91-03DC-439F-8C5B-CD1537465149}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.UiTests", "tests\ZungMail.UiTests\ZungMail.UiTests.csproj", "{85212F85-12D2-4EBF-9307-D5BB3F32E26A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{D63FA135-C547-4328-B940-6FF9A8A5D21C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.Update.Protocol", "src\ZungMail.Update.Protocol\ZungMail.Update.Protocol.csproj", "{D564E6E3-9247-4B80-9FD5-364473409CE3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.UpdateServer", "src\ZungMail.UpdateServer\ZungMail.UpdateServer.csproj", "{B3D57648-1AC8-41A6-9A48-C114FC8F0E48}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.UpdateServer.Tests", "tests\ZungMail.UpdateServer.Tests\ZungMail.UpdateServer.Tests.csproj", "{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1A1B2C3D-0006-4000-8000-000000000006}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1B2C3D-0006-4000-8000-000000000006}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1B2C3D-0006-4000-8000-000000000006}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1B2C3D-0006-4000-8000-000000000006}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A1B2C3D-0001-4000-8000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1B2C3D-0001-4000-8000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1B2C3D-0001-4000-8000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1B2C3D-0001-4000-8000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A1B2C3D-0002-4000-8000-000000000002}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1B2C3D-0002-4000-8000-000000000002}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1B2C3D-0002-4000-8000-000000000002}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1B2C3D-0002-4000-8000-000000000002}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A1B2C3D-0003-4000-8000-000000000003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1B2C3D-0003-4000-8000-000000000003}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1B2C3D-0003-4000-8000-000000000003}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1B2C3D-0003-4000-8000-000000000003}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A1B2C3D-0004-4000-8000-000000000004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1B2C3D-0004-4000-8000-000000000004}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1B2C3D-0004-4000-8000-000000000004}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1B2C3D-0004-4000-8000-000000000004}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A1B2C3D-0005-4000-8000-000000000005}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1B2C3D-0005-4000-8000-000000000005}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1B2C3D-0005-4000-8000-000000000005}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1B2C3D-0005-4000-8000-000000000005}.Release|Any CPU.Build.0 = Release|Any CPU
+		{85212F85-12D2-4EBF-9307-D5BB3F32E26A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{85212F85-12D2-4EBF-9307-D5BB3F32E26A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{85212F85-12D2-4EBF-9307-D5BB3F32E26A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{85212F85-12D2-4EBF-9307-D5BB3F32E26A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D564E6E3-9247-4B80-9FD5-364473409CE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D564E6E3-9247-4B80-9FD5-364473409CE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D564E6E3-9247-4B80-9FD5-364473409CE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D564E6E3-9247-4B80-9FD5-364473409CE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3D57648-1AC8-41A6-9A48-C114FC8F0E48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3D57648-1AC8-41A6-9A48-C114FC8F0E48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3D57648-1AC8-41A6-9A48-C114FC8F0E48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3D57648-1AC8-41A6-9A48-C114FC8F0E48}.Release|Any CPU.Build.0 = Release|Any CPU
+		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{85212F85-12D2-4EBF-9307-D5BB3F32E26A} = {25F34D91-03DC-439F-8C5B-CD1537465149}
+		{D564E6E3-9247-4B80-9FD5-364473409CE3} = {D63FA135-C547-4328-B940-6FF9A8A5D21C}
+		{B3D57648-1AC8-41A6-9A48-C114FC8F0E48} = {D63FA135-C547-4328-B940-6FF9A8A5D21C}
+		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445} = {25F34D91-03DC-439F-8C5B-CD1537465149}
+	EndGlobalSection
+EndGlobal

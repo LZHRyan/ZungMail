@@ -1,0 +1,43 @@
+# ===== 构建产物（可再生成，不入库）=====
+**/bin/
+**/obj/
+artifacts/
+
+# ===== 打包产物与中间目录 =====
+# dist 里是安装包 / MSI / 便携 zip（每个版本 60–80 MB，历史版本累积上 GB）
+dist/
+packaging/obj/
+
+# ===== 本机工具 / 会话残留 =====
+.acecode/
+ACECODE_TMPDIR/
+.cr/
+.trae-html-share-packages/
+
+# ===== 运行数据与日志（绝不入库）=====
+logs/
+*.log
+mail.db
+mail.db-*
+*.sqlite
+*.sqlite3
+*.eml
+
+# ===== 凭据与证书 =====
+*.pfx
+*.p12
+*.snk
+*.key
+secrets.*
+
+# ===== 编辑器 / 系统 =====
+.vs/
+*.user
+*.suo
+Thumbs.db
+desktop.ini
+.DS_Store
+# ===== 需求与开发过程材料（只在本机，不进仓库）=====
+# 分批落地日志、对标分析、技术评估、PRD/UI 原型、openspec 变更过程记录
+workdocs/
+openspec/changes/

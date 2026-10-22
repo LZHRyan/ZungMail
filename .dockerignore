@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.acecode/
+dist/
+tests/**/bin/
+tests/**/obj/
+packaging/obj/
+src/**/bin/
+src/**/obj/
+*.user

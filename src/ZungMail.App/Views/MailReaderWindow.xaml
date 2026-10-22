@@ -1,0 +1,589 @@
+<views:DialogWindow x:Class="ZungMail.App.Views.MailReaderWindow"
+                    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="clr-namespace:ZungMail.App.Views"
+                    xmlns:ct="clr-namespace:ZungMail.App.Controls"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                    Title="{Binding WindowTitle}"
+                    Icon="pack://application:,,,/Assets/Brand/ZungMail.ico"
+                    Width="980"
+                    Height="780"
+                    MinWidth="700"
+                    MinHeight="440"
+                    Background="{DynamicResource WindowBackgroundBrush}"
+                    FontFamily="{StaticResource AppFont}"
+                    FontSize="13"
+                    TextOptions.TextFormattingMode="Ideal"
+                    TextOptions.TextRenderingMode="ClearType"
+                    UseLayoutRounding="True"
+                    SnapsToDevicePixels="True"
+                    PreviewKeyDown="OnReaderPreviewKeyDown">
+
+    <views:DialogWindow.Resources>
+        <!-- 附件卡片：与主窗口阅读区同一套交互（单击预览，右键下载 / 另存 / 定位） -->
+        <DataTemplate x:Key="ReaderAttachmentTemplate">
+            <Button Style="{StaticResource AttachmentCard}"
+                    Margin="0,0,8,8"
+                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                    Command="{Binding DataContext.PreviewAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding}"
+                    ToolTip="{Binding LocalPath}">
+                <Button.ContextMenu>
+                    <ContextMenu Style="{StaticResource MailContextMenu}"
+                                 DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                  Header="下载附件"
+                                  Command="{Binding PlacementTarget.Tag.DownloadAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding}"
+                                  Visibility="{Binding IsDownloaded, Converter={StaticResource InverseBoolToVisibility}}" />
+                        <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                  Header="预览"
+                                  Command="{Binding PlacementTarget.Tag.PreviewAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding}" />
+                        <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                  Header="用本机程序打开"
+                                  Command="{Binding PlacementTarget.Tag.OpenAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding LocalPath}" />
+                        <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                  Header="另存为…"
+                                  Command="{Binding PlacementTarget.Tag.SaveAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding}" />
+                        <Separator Style="{StaticResource MailContextMenuSeparator}" />
+                        <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                  Header="打开所在文件夹"
+                                  Command="{Binding PlacementTarget.Tag.RevealAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding}" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ct:AttachmentIcon FileName="{Binding FileName}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding FileName}"
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource InkBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Style="{StaticResource MutedText}" Text="{Binding SizeDisplay}" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </DataTemplate>
+
+        <!-- 标签徽标：只读展示该邮件已打的标签 -->
+        <DataTemplate x:Key="ReaderTagTemplate">
+            <Grid Margin="0,0,6,4">
+                <Border CornerRadius="6" Opacity="0.16" Background="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                <Border CornerRadius="6" BorderThickness="1" Opacity="0.35" BorderBrush="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                <TextBlock Text="{Binding Name}"
+                           Margin="7,1"
+                           FontSize="10.5"
+                           FontWeight="Bold"
+                           Foreground="{Binding Color, Converter={StaticResource HexToBrush}}" />
+            </Grid>
+        </DataTemplate>
+    </views:DialogWindow.Resources>
+
+    <!-- 外层 1px 边框：与主窗口 / 其它对话框同一条 RuleStrongBrush，
+         否则独立阅读窗叠在主窗口上时两块浅色界面会连成一片、分不清窗口边界。 -->
+    <Border Background="{DynamicResource WindowBackgroundBrush}"
+            BorderBrush="{DynamicResource RuleStrongBrush}"
+            BorderThickness="1"
+            SnapsToDevicePixels="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+        <!-- ============ 标题栏 ============ -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource ChromeBrush}"
+                BorderBrush="{DynamicResource RuleBrush}"
+                BorderThickness="0,0,0,1"
+                MouseLeftButtonDown="OnReaderTitleBarMouseDown">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <Image Width="22"
+                           Height="22"
+                           Source="pack://application:,,,/Assets/Brand/ZungMailMark64.png"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="{Binding WindowTitle}"
+                               MaxWidth="640"
+                               FontWeight="SemiBold"
+                               Margin="9,0,0,0"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource InkBrush}" />
+                    <TextBlock Text="独立阅读窗口"
+                               FontSize="12"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource MutedBrush}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource WinBtn}"
+                            Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                            CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                            ToolTip="最小化">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoMin}" />
+                    </Button>
+                    <Button Style="{StaticResource WinBtn}"
+                            Command="{x:Static SystemCommands.MaximizeWindowCommand}"
+                            CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                            ToolTip="最大化 / 还原">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoMax}" />
+                    </Button>
+                    <Button Style="{StaticResource WinBtnClose}"
+                            Command="{x:Static SystemCommands.CloseWindowCommand}"
+                            CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                            ToolTip="关闭">
+                        <Path Style="{StaticResource IconPathSmall}"
+                              Data="{StaticResource IcoClose}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ 操作条：回复 / 回复全部 / 转发 ============ -->
+        <Border Grid.Row="1"
+                Padding="12,8"
+                Background="{DynamicResource ChromeBrush}"
+                BorderBrush="{DynamicResource RuleBrush}"
+                BorderThickness="0,0,0,1"
+                Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
+            <WrapPanel Orientation="Horizontal">
+                <Button Style="{StaticResource Btn}"
+                        Command="{Binding ReplyCommand}"
+                        IsEnabled="{Binding CanReplyOrForward}"
+                        ToolTip="回复发件人（草稿邮件不能回复）">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoReply}" />
+                        <TextBlock Text="回复" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Btn}"
+                        Margin="4,0,0,0"
+                        Command="{Binding ReplyAllCommand}"
+                        IsEnabled="{Binding CanReplyOrForward}"
+                        ToolTip="回复发件人及全部收件人（草稿邮件不能回复）">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoUsers}" />
+                        <TextBlock Text="回复全部" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Btn}"
+                        Margin="4,0,0,0"
+                        Command="{Binding ForwardCommand}"
+                        IsEnabled="{Binding CanReplyOrForward}"
+                        ToolTip="转发（草稿邮件不能转发）">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoForward}" />
+                        <TextBlock Text="转发" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource Btn}"
+                        Margin="4,0,0,0"
+                        Command="{Binding ForwardAsAttachmentCommand}"
+                        IsEnabled="{Binding CanReplyOrForward}"
+                        ToolTip="作为附件转发：把整封原邮件作为 .eml 附件发出去">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoPaperclip}" />
+                        <TextBlock Text="作为附件转发" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+        </Border>
+
+        <!-- ============ 阅读区 ============ -->
+        <Grid Grid.Row="2" Background="{DynamicResource ReaderBrush}">
+            <!-- 三段式：0 邮件头（附件多时自身滚动） / 1 正文（独立滚动，WebView2 不能放进外层 ScrollViewer） / 2 远程图片提示条 -->
+            <Grid Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        BorderBrush="{DynamicResource RuleBrush}"
+                        BorderThickness="0,0,0,1">
+                    <!-- 邮件头右键：查看这封邮件的原始 MIME 源码（与主窗口列表右键同一入口） -->
+                    <Border.ContextMenu>
+                        <ContextMenu Style="{StaticResource MailContextMenu}"
+                                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                      Header="查看邮件源码"
+                                      Command="{Binding ViewMailSourceCommand}"
+                                      ToolTip="查看这封邮件的原始 MIME 源码（离线时显示本地重建版本）" />
+                        </ContextMenu>
+                    </Border.ContextMenu>
+                    <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="24,18,24,14">
+                            <TextBox Style="{StaticResource SelectableText}"
+                                     FontSize="18"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource InkBrush}"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding Detail.SubjectDisplay, Mode=OneWay}" />
+
+                            <!-- 疑似钓鱼：发件人域名与本机企业域名高度相似（与主窗口阅读区一致） -->
+                            <Border Margin="0,10,0,0"
+                                    Padding="10,8"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource CriticalSoftBrush}"
+                                    BorderBrush="{DynamicResource CriticalBrush}"
+                                    BorderThickness="1"
+                                    Visibility="{Binding ShowDetailPhishing, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Path Grid.Column="0"
+                                          Style="{StaticResource IconPathSmall}"
+                                          VerticalAlignment="Center"
+                                          Stroke="{DynamicResource CriticalBrush}"
+                                          Data="{StaticResource IcoAlert}" />
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="警惕钓鱼 · 发件人域名与你自己的域名高度相似"
+                                                   FontSize="12.5"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource CriticalBrush}" />
+                                        <TextBlock Text="{Binding DetailPhishingHint}"
+                                                   Margin="0,2,0,0"
+                                                   FontSize="11.5"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Ink2Brush}" />
+                                        <TextBlock Text="在核实发件人身份之前，不要按邮件里的账号付款或变更收款信息。"
+                                                   Margin="0,2,0,0"
+                                                   FontSize="11.5"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource MutedBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- 陌生发件人：首次收到该地址来信（与主窗口阅读区一致，独立窗口也不能漏） -->
+                            <Border Margin="0,10,0,0"
+                                    Padding="10,8"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource WarningSoftBrush}"
+                                    BorderBrush="{DynamicResource WarningBrush}"
+                                    BorderThickness="1"
+                                    Visibility="{Binding ShowDetailStranger, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Path Grid.Column="0"
+                                          Style="{StaticResource IconPathSmall}"
+                                          VerticalAlignment="Center"
+                                          Stroke="{DynamicResource WarningBrush}"
+                                          Data="{StaticResource IcoAlert}" />
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="陌生发件人 · 首次收到该地址来信"
+                                                   FontSize="12.5"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource WarningBrush}" />
+                                        <TextBlock Text="{Binding Detail.StrangerHint}"
+                                                   Margin="0,2,0,0"
+                                                   FontSize="11.5"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Ink2Brush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- 行业邮件类型：订舱确认 / SI / VGM / 提单草稿 / AN / 账单 / 查验 / 甩柜 / 延误 -->
+                            <Border Margin="0,10,0,0"
+                                    Padding="10,7"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource SidebarBrush}"
+                                    BorderBrush="{DynamicResource RuleBrush}"
+                                    BorderThickness="1"
+                                    Visibility="{Binding Detail.HasIndustryType, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="8"
+                                            Height="8"
+                                            CornerRadius="4"
+                                            VerticalAlignment="Center"
+                                            Background="{Binding Detail.IndustryTypeColor, Converter={StaticResource HexToBrush}}" />
+                                    <TextBlock Margin="7,0,0,0"
+                                               Style="{StaticResource LabelText}"
+                                               Text="邮件类型"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{Binding Detail.IndustryTypeColor, Converter={StaticResource HexToBrush}}"
+                                               Text="{Binding Detail.IndustryTypeLabel}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 发件人 / 时间 / 大小 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                <Grid VerticalAlignment="Top">
+                                    <Border Width="34"
+                                            Height="34"
+                                            CornerRadius="17"
+                                            Background="{Binding Detail.AvatarColor, Converter={StaticResource HexToBrush}}">
+                                        <TextBlock Text="{Binding Detail.Initial}"
+                                                   Foreground="White"
+                                                   FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding HasDetailAvatar, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    </Border>
+                                    <!-- 发件人头像（Gravatar 命中才有） -->
+                                    <Border Width="34"
+                                            Height="34"
+                                            CornerRadius="17"
+                                            Background="{Binding DetailAvatarBrush}"
+                                            Visibility="{Binding HasDetailAvatar, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+                                <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBox Style="{StaticResource SelectableText}"
+                                             FontSize="13"
+                                             FontWeight="SemiBold"
+                                             Foreground="{DynamicResource InkBrush}"
+                                             TextWrapping="NoWrap"
+                                             Text="{Binding Detail.FromDisplay, Mode=OneWay}" />
+                                    <TextBox Style="{StaticResource SelectableText}"
+                                             TextWrapping="NoWrap"
+                                             Text="{Binding Detail.FromEmail, Mode=OneWay}" />
+                                </StackPanel>
+                                <StackPanel Margin="16,0,0,0" VerticalAlignment="Center">
+                                    <TextBox Style="{StaticResource SelectableText}"
+                                             TextWrapping="NoWrap"
+                                             Text="{Binding Detail.FullDateDisplay, Mode=OneWay}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Style="{StaticResource MutedText}" Text="大小：" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Text="{Binding SizeDisplayText, Mode=OneWay}"
+                                                   TextTrimming="None" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <TextBox Style="{StaticResource SelectableText}"
+                                     Margin="0,10,0,0"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding Detail.ToDisplay, Mode=OneWay, StringFormat=收件人：{0}}" />
+                            <TextBox Style="{StaticResource SelectableText}"
+                                     Margin="0,4,0,0"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding Detail.CcDisplay, Mode=OneWay, StringFormat=抄送：{0}}"
+                                     Visibility="{Binding Detail.CcDisplay, Converter={StaticResource NotEmptyToVisibility}}" />
+                            <TextBox Style="{StaticResource SelectableText}"
+                                     Margin="0,4,0,0"
+                                     TextWrapping="Wrap"
+                                     Text="{Binding Detail.BccDisplay, Mode=OneWay, StringFormat=密送：{0}}"
+                                     Visibility="{Binding Detail.BccDisplay, Converter={StaticResource NotEmptyToVisibility}}" />
+
+                            <!-- 附件 -->
+                            <StackPanel Margin="0,12,0,0"
+                                        Visibility="{Binding HasAttachments, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="附件"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource InkBrush}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding VisibleAttachments.Count, StringFormat=（{0} 个）}" />
+                                    <Button Style="{StaticResource Btn}"
+                                            Margin="10,0,0,0"
+                                            Height="26"
+                                            Padding="10,0"
+                                            Command="{Binding SaveAllAttachmentsCommand}"
+                                            ToolTip="把所有附件保存到同一目录">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoFolder}" />
+                                            <TextBlock Text="全部保存" Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <ItemsControl Margin="0,8,0,0"
+                                              ItemsSource="{Binding VisibleAttachments}"
+                                              ItemTemplate="{StaticResource ReaderAttachmentTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- 标签：只读展示，编辑仍在主窗口 -->
+                            <ItemsControl Margin="0,12,0,0"
+                                          ItemsSource="{Binding Tags}"
+                                          ItemTemplate="{StaticResource ReaderTagTemplate}"
+                                          Visibility="{Binding HasTags, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- 正文 -->
+                <Grid Grid.Row="1">
+                    <Grid Visibility="{Binding ShowBodyView, Converter={StaticResource BoolToVisibility}}">
+                        <views:MailBodyView UseHtml="{Binding UseHtmlRendering}"
+                                            Document="{Binding BodyHtmlDocument}"
+                                            PlainText="{Binding BodyDisplay}"
+                                            HtmlSource="{Binding BodyHtmlSource}"
+                                            InlineImagePaths="{Binding InlineImagePaths}"
+                                            BodyFontSize="{Binding BodyFontSize}"
+                                            IsDark="{Binding IsDark}"
+                                            EmlDirectory="{Binding EmlDirectory}" />
+                    </Grid>
+
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding IsBodyLoading, Converter={StaticResource BoolToVisibility}}">
+                        <ProgressBar Width="120"
+                                     Height="4"
+                                     IsIndeterminate="True"
+                                     HorizontalAlignment="Center"
+                                     Foreground="{DynamicResource AccentBrush}"
+                                     Background="{DynamicResource RuleBrush}"
+                                     BorderThickness="0" />
+                        <TextBlock Text="正在下载正文…"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,10,0,0"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="邮件头已显示，可以先看主题、发件人与附件"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,4,0,0"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- 正文没取到（上次解析失败 / 缓存被清 / 服务器返回空体）：给一个手动补救入口 -->
+                    <Border HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            MaxWidth="380"
+                            Padding="20,18"
+                            Background="{DynamicResource WindowBackgroundBrush}"
+                            BorderBrush="{DynamicResource RuleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Visibility="{Binding ShowReloadBodyButton, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="没有取到正文内容"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource InkBrush}" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       Margin="0,6,0,0"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Text="可能是上次下载没完成或解析失败。若这封邮件本来有正文，重新获取会再向服务器拉一次。" />
+                            <Button Style="{StaticResource BtnPrimary}"
+                                    Margin="0,14,0,0"
+                                    HorizontalAlignment="Center"
+                                    Content="重新获取正文"
+                                    Command="{Binding ReloadBodyCommand}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- 远程图片提示条 -->
+                <Border Grid.Row="2"
+                        Padding="18,8"
+                        BorderBrush="{DynamicResource RuleBrush}"
+                        BorderThickness="0,1,0,0"
+                        Background="{DynamicResource ChromeBrush}"
+                        Visibility="{Binding ShowRemoteImagesPrompt, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource MutedText}"
+                                   VerticalAlignment="Center"
+                                   Text="此邮件包含远程图片，已默认阻止（防追踪像素）。" />
+                        <Button Style="{StaticResource BtnGhost}"
+                                Margin="10,0,0,0"
+                                Height="26"
+                                Content="显示图片"
+                                Command="{Binding LoadRemoteImagesCommand}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 邮件头读取中 -->
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding ShowLoading, Converter={StaticResource BoolToVisibility}}">
+                <ProgressBar Width="120"
+                             Height="4"
+                             IsIndeterminate="True"
+                             HorizontalAlignment="Center"
+                             Foreground="{DynamicResource AccentBrush}"
+                             Background="{DynamicResource RuleBrush}"
+                             BorderThickness="0" />
+                <TextBlock Text="正在读取邮件…"
+                           Style="{StaticResource MutedText}"
+                           Margin="0,10,0,0"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- 空态 -->
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding ShowPlaceholder, Converter={StaticResource BoolToVisibility}}">
+                <Path Style="{StaticResource IconPath}"
+                      Width="30"
+                      Height="30"
+                      HorizontalAlignment="Center"
+                      Data="{StaticResource IcoMail}"
+                      Stroke="{DynamicResource RuleStrongBrush}" />
+                <TextBlock Text="没有可显示的邮件"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Margin="0,10,0,0"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource MutedBrush}" />
+                <TextBlock Text="双击列表中的邮件即可在这里专注阅读"
+                           Style="{StaticResource MutedText}"
+                           Margin="0,6,0,0"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- ============ 状态行 ============ -->
+        <Border Grid.Row="3"
+                Padding="16,6"
+                Background="{DynamicResource ChromeBrush}"
+                BorderBrush="{DynamicResource RuleBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <TextBlock Style="{StaticResource MutedText}"
+                           Text="{Binding StatusText}"
+                           VerticalAlignment="Center" />
+                <TextBlock Style="{StaticResource MutedText}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Text="Esc 关闭窗口" />
+            </Grid>
+        </Border>
+        </Grid>
+    </Border>
+</views:DialogWindow>

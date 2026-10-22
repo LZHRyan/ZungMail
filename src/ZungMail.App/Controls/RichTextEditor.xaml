@@ -1,0 +1,26 @@
+<UserControl x:Class="ZungMail.App.Controls.RichTextEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             Background="{DynamicResource ReaderBrush}">
+    <Grid>
+        <!-- 富文本位面：WebView2 承载 contenteditable 页面，Toolbar 在页面内部 -->
+        <wv2:WebView2 x:Name="Browser" Visibility="Collapsed" />
+
+        <!-- 降级位面：运行时缺失 / 渲染进程崩溃时仍可撰写纯文本，保证发送链路不中断 -->
+        <TextBox x:Name="FallbackBox"
+                 Visibility="Collapsed"
+                 AcceptsReturn="True"
+                 AcceptsTab="True"
+                 TextWrapping="Wrap"
+                 BorderThickness="0"
+                 Padding="16,14"
+                 Background="Transparent"
+                 Foreground="{DynamicResource InkBrush}"
+                 CaretBrush="{DynamicResource InkBrush}"
+                 FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Disabled"
+                 TextChanged="OnFallbackTextChanged" />
+    </Grid>
+</UserControl>

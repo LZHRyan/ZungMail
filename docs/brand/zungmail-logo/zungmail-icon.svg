@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>ZungMail</title>
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="52" y1="8" x2="468" y2="508">
+      <stop offset="0" stop-color="#6FB0FF"/>
+      <stop offset=".4" stop-color="#2F63F7"/>
+      <stop offset="1" stop-color="#2B18A6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".2" cy="0" r=".88">
+      <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08125C" stop-opacity="0"/>
+      <stop offset="1" stop-color="#08125C" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="letter" gradientUnits="userSpaceOnUse" x1="172" y1="166" x2="345" y2="348">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#CFDDFA"/>
+    </linearGradient>
+    <filter id="soft" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="11" stdDeviation="15" flood-color="#061152" flood-opacity=".36"/>
+    </filter>
+    <clipPath id="clip"><rect width="512" height="512" rx="118"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="118" fill="url(#glow)"/>
+  <g clip-path="url(#clip)">
+    <rect y="268" width="512" height="244" fill="url(#depth)"/>
+  </g>
+  <g transform="translate(256 256) scale(1.13) translate(-256 -256)">
+    <path d="M172 166h165L172 344h165" fill="none" stroke="url(#letter)" stroke-width="52"
+          stroke-linejoin="bevel" stroke-linecap="round" filter="url(#soft)"/>
+  </g>
+  <rect x="2" y="2" width="508" height="508" rx="117" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="2.5"/>
+</svg>

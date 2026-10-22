@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>ZungMail.Update.Protocol</RootNamespace>
+    <!-- 客户端与升级服务共用：不引第三方依赖，保证两边版本比较与 DTO 完全一致 -->
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,35 @@
+<Application x:Class="ZungMail.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:cv="clr-namespace:ZungMail.App.Converters">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Fluent 配色资源：只并入主题色，不并入控件样式。
+                     控件样式字典会给 ComboBox 等基础控件套上 Fluent 隐式模板，
+                     与现有自绘模板（Popup / ToggleButton 组合）冲突，导致下拉点不开。 -->
+                <ui:ThemesDictionary Theme="Light" />
+
+                <!-- 索引 0 为可替换的调色板：ThemeManager 在切换主题时整体替换 -->
+                <ResourceDictionary Source="Themes/Palette.Light.xaml" />
+                <ResourceDictionary Source="Themes/Icons.xaml" />
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI, Microsoft YaHei, PingFang SC, Hiragino Sans GB</FontFamily>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+            <cv:HexToBrushConverter x:Key="HexToBrush" />
+            <cv:NotEmptyToVisibilityConverter x:Key="NotEmptyToVisibility" />
+            <cv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility" />
+            <cv:EmptyToVisibilityConverter x:Key="EmptyToVisibility" />
+            <cv:EnumToBooleanConverter x:Key="EnumToBoolean" />
+            <cv:ResourceKeyConverter x:Key="ResourceKey" />
+            <cv:EnumDisplayConverter x:Key="EnumDisplay" />
+            <cv:InverseBooleanConverter x:Key="InverseBool" />
+            <cv:FileTypeGlyphConverter x:Key="FileTypeGlyph" />
+            <cv:FileTypeBrushConverter x:Key="FileTypeBrush" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
