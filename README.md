@@ -8,7 +8,7 @@
     <img alt=".net" src="https://img.shields.io/badge/.NET-8.0-512bd4" />
     <img alt="ui" src="https://img.shields.io/badge/UI-WPF%20%2B%20WebView2-6b4fbb" />
     <img alt="license" src="https://img.shields.io/badge/license-MIT-2ea44f" />
-    <img alt="version" src="https://img.shields.io/badge/version-1.2.0-6b7280" />
+    <img alt="version" src="https://img.shields.io/badge/version-1.2.1-6b7280" />
   </p>
 </div>
 

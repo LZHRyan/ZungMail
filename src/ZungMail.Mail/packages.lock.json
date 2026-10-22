@@ -72,11 +72,23 @@
         "type": "Project",
         "dependencies": {
           "AngleSharp": "[1.8.5, )",
-          "ZungMail.Update.Protocol": "[1.2.0, )"
+          "ZungMail.Update.Protocol": "[1.2.1, )"
         }
       },
       "zungmail.update.protocol": {
         "type": "Project"
+      }
+    },
+    "net8.0/win-x64": {
+      "System.Security.Cryptography.Pkcs": {
+        "type": "Direct",
+        "requested": "[10.0.13, )",
+        "resolved": "10.0.13",
+        "contentHash": "a+EovgC1fBnwdlQ6cn3j4JFBfKqiFaFvoAhjisOoSvazLAcIznaBzPQP0oYnvccmeXfqUH1KebVZOxSeH6rMaw==",
+        "dependencies": {
+          "Microsoft.Bcl.Cryptography": "10.0.13",
+          "System.Formats.Asn1": "10.0.13"
+        }
       }
     }
   }

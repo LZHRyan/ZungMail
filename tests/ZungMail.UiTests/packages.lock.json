@@ -522,10 +522,10 @@
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
           "Microsoft.Web.WebView2": "[1.0.3179.45, )",
           "WPF-UI": "[4.3.0, )",
-          "ZungMail.Application": "[1.2.0, )",
-          "ZungMail.Core": "[1.2.0, )",
-          "ZungMail.Infrastructure": "[1.2.0, )",
-          "ZungMail.Mail": "[1.2.0, )"
+          "ZungMail.Application": "[1.2.1, )",
+          "ZungMail.Core": "[1.2.1, )",
+          "ZungMail.Infrastructure": "[1.2.1, )",
+          "ZungMail.Mail": "[1.2.1, )"
         }
       },
       "zungmail.application": {
@@ -533,14 +533,14 @@
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "Microsoft.Extensions.Logging.Abstractions": "[8.0.2, )",
-          "ZungMail.Core": "[1.2.0, )"
+          "ZungMail.Core": "[1.2.1, )"
         }
       },
       "zungmail.core": {
         "type": "Project",
         "dependencies": {
           "AngleSharp": "[1.8.5, )",
-          "ZungMail.Update.Protocol": "[1.2.0, )"
+          "ZungMail.Update.Protocol": "[1.2.1, )"
         }
       },
       "zungmail.infrastructure": {
@@ -549,8 +549,8 @@
           "Microsoft.Data.Sqlite": "[8.0.10, )",
           "Microsoft.Extensions.Logging.Abstractions": "[8.0.2, )",
           "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
-          "ZungMail.Core": "[1.2.0, )",
-          "ZungMail.Update.Protocol": "[1.2.0, )"
+          "ZungMail.Core": "[1.2.1, )",
+          "ZungMail.Update.Protocol": "[1.2.1, )"
         }
       },
       "zungmail.mail": {
@@ -559,7 +559,7 @@
           "MailKit": "[4.18.1, )",
           "Microsoft.Extensions.Logging.Abstractions": "[8.0.2, )",
           "System.Security.Cryptography.Pkcs": "[10.0.13, )",
-          "ZungMail.Core": "[1.2.0, )"
+          "ZungMail.Core": "[1.2.1, )"
         }
       },
       "zungmail.update.protocol": {

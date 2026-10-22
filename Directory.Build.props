@@ -11,8 +11,8 @@
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <Prefer32Bit>false</Prefer32Bit>
-    <!-- 1.2.0：MailClient → ZungMail 全量改名版本（程序名、安装目录、数据目录都变了） -->
-    <Version>1.2.0</Version>
+    <!-- 1.2.1：1.2.0 改名版的第一个补丁（文档/仓库整理与 .gitattributes，功能不变） -->
+    <Version>1.2.1</Version>
     <Product>ZungMail</Product>
     <Authors>Leung</Authors>
     <!-- 版本资源补全：安全软件 / SmartScreen 会看「公司、产品、描述、版权」是否齐全，
