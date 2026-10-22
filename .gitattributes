@@ -1,0 +1,37 @@
+# 文件属性：规定 git 如何存取文本行尾与二进制文件。
+# 项目是纯 Windows 桌面端（WPF / net8.0-windows），代码与构建脚本统一 CRLF，文档统一 LF。
+
+# 默认：自动识别文本并在检出时用 CRLF（等价于 core.autocrlf=true，但对所有平台生效）
+* text=auto eol=crlf
+
+# 文档与配置走 LF：GitHub、编辑器、CI 工具链都更省心
+*.md       text eol=lf
+*.json     text eol=lf
+*.yaml     text eol=lf
+*.yml      text eol=lf
+*.config   text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# 二进制：禁止换行转换与文本合并，避免图片被"合并"损坏
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+
+# 邮件原文/导出的 eml 由程序读写，不做任何行尾处理
+*.eml -text
+
+# 代码与工程文件显式声明 CRLF（PowerShell 5.1 读取带中文的 .ps1/.nsi 依赖 CRLF + UTF-8 BOM）
+*.cs     text eol=crlf
+*.xaml   text eol=crlf
+*.csproj text eol=crlf
+*.sln    text eol=crlf
+*.ps1    text eol=crlf
+*.nsi    text eol=crlf
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
