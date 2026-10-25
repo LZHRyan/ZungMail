@@ -270,7 +270,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>侧边栏标签列表（收藏的标签视图入口）。</summary>
     public ObservableCollection<MailTag> SidebarTags { get; } = new();
 
-    public ObservableCollection<MailRow> Messages { get; } = new();
+    public ObservableRangeCollection<MailRow> Messages { get; } = new();
 
     // ---------------- 状态 ----------------
 
@@ -1255,8 +1255,9 @@ public sealed partial class MainViewModel : ObservableObject
             await ReloadSidebarTagsAsync();
             await RefreshLocalTotalAsync();
             Mark("标签与统计");
-            await RefreshStorageAsync();
-            Mark("存储占用");
+            // 存储快照要递归统计整个数据目录（机械盘上实测 60 秒以上），不能挡启动：
+            // 放到「就绪」之后后台补，状态栏的数字晚几秒出现，但界面立刻可用。
+            FireAndForget.Run(() => RefreshStorageAsync(force: true), "刷新存储占用");
             await _mailActions.InitializeAsync();
             await RefreshPendingStateAsync();
             Mark("待同步队列");
@@ -2192,8 +2193,9 @@ public sealed partial class MainViewModel : ObservableObject
             StartupTrace.Mark($"列表查询 {rows.Count} 行/共 {total} 封");
 
             TotalCount = total;
-            Messages.Clear();
-            foreach (var row in rows) Messages.Add(row);
+            // 整批替换：逐条 Add 会给 ListBox 发 500 次通知，每次都要重排
+            Messages.ReplaceAll(rows);
+            StartupTrace.Mark("列表 填行");
 
             IsEmpty = Messages.Count == 0;
             var countText = ConversationMode
@@ -2208,6 +2210,7 @@ public sealed partial class MainViewModel : ObservableObject
             if (Messages.Count > 0) SelectedRow = Messages[0];
             else if (SelectedRow is null) await LoadDetailAsync(null); // 本来就没有选中行时，属性不会触发变更
             else SelectedRow = null;
+            StartupTrace.Mark("列表 选中");
 
             await LetUiRenderAsync();
             StartupTrace.Mark("列表上屏");

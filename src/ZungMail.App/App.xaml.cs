@@ -47,6 +47,46 @@ public partial class App : System.Windows.Application
         StartupTrace.Mark(stage);
     }
 
+    /// <summary>
+    /// 初始化数据库；老库需要升级时先弹进度窗口，再把同步的 SQLite 迁移放到后台线程，
+    /// 这个过程在机械盘上可能持续几分钟（实测 163 秒），不能占着 UI 线程干等。
+    /// 全新安装（版本 0）直接初始化：建表是秒级，弹窗只会闪一下。
+    /// </summary>
+    private async Task RunDatabaseInitializationAsync()
+    {
+        var initializer = _host!.Services.GetRequiredService<DatabaseInitializer>();
+
+        var current = 0;
+        try
+        {
+            current = initializer.PeekSchemaVersion();
+        }
+        catch (Exception ex)
+        {
+            // 版本都读不出来（库损坏 / 权限异常）就照旧走老路径，让原有报错逻辑处理
+            StartupTrace.Mark($"数据库 读版本失败：{ex.GetType().Name}");
+        }
+
+        if (current <= 0 || current >= DatabaseInitializer.SchemaVersion)
+        {
+            initializer.Initialize();
+            return;
+        }
+
+        StartupTrace.Mark($"数据库 需要升级 v{current} → v{DatabaseInitializer.SchemaVersion}");
+        var splash = new StartupUpgradeWindow(current, DatabaseInitializer.SchemaVersion);
+        splash.Show();
+
+        try
+        {
+            await Task.Run(() => initializer.Initialize(splash.Progress)).ConfigureAwait(true);
+        }
+        finally
+        {
+            splash.Close();
+        }
+    }
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         // 必须最先开启：后面的每一段都会各自落一行日志，进程卡在哪一段一眼可见
@@ -80,14 +120,11 @@ public partial class App : System.Windows.Application
 
         // 覆盖基础设施层的数据库初始化注册：把内部分段耗时接到启动计时上
         // （Infrastructure 不引用 App 层，只能在这里注入回调；同类型后注册者生效）。
-        builder.Services.AddSingleton(sp =>
-        {
-            var initializer = new DatabaseInitializer(
-                sp.GetRequiredService<SqliteConnectionFactory>(),
-                StartupTrace.Mark);
-            initializer.Initialize();
-            return initializer;
-        });
+        // 注意：这里不再顺手 Initialize——老库升级可能要几分钟，得由启动流程先弹进度窗口，
+        // 再把初始化丢到后台线程跑。
+        builder.Services.AddSingleton(sp => new DatabaseInitializer(
+            sp.GetRequiredService<SqliteConnectionFactory>(),
+            StartupTrace.Mark));
         builder.Services.AddZungMailMail();
         builder.Services.AddZungMailApplication();
 
@@ -175,9 +212,10 @@ public partial class App : System.Windows.Application
         _ = _host.Services.GetRequiredService<IAppPaths>();
         MarkStartupStage("数据目录准备");
 
-        // 数据库建表 / 迁移是同步 SQLite 调用，就发生在第一次解析仓储时；
-        // 显式先解析一次，把这段耗时从「宿主启动」里单独拆出来。
-        _ = _host.Services.GetRequiredService<DatabaseInitializer>();
+        // 数据库建表 / 迁移是同步 SQLite 调用。老库升级（例如加生成列 + 建索引）在机械盘上
+        // 实测要 163 秒，所以：版本落后就先弹进度窗口，再把初始化丢到后台线程，
+        // 让用户看到「第 N/M 步」而不是两分钟没有任何反应。
+        await RunDatabaseInitializationAsync().ConfigureAwait(true);
         MarkStartupStage("数据库初始化");
 
         var settings = _host.Services.GetRequiredService<ISettingsStore>();

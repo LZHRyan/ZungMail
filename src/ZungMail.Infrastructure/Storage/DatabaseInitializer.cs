@@ -386,8 +386,22 @@ WHERE id = COALESCE(
         _trace = trace;
     }
 
-    /// <summary>幂等初始化；多次调用仅首次执行 DDL 与迁移。</summary>
-    public void Initialize()
+    /// <summary>
+    /// 读取库里的架构版本（毫秒级，只查 meta）：启动流程用它判断「要不要先弹升级进度窗口」。
+    /// 库不存在或还没初始化时返回 0。
+    /// </summary>
+    public int PeekSchemaVersion()
+    {
+        using var connection = _factory.Create();
+        return ReadSchemaVersion(connection);
+    }
+
+    /// <summary>
+    /// 幂等初始化；多次调用仅首次执行 DDL 与迁移。
+    /// <paramref name="progress"/> 用于升级进度窗口：老库升级时按迁移步骤逐步回报，
+    /// 机械盘上重建索引可能持续几分钟，没有进度用户会以为程序挂了。
+    /// </summary>
+    public void Initialize(IProgress<DatabaseUpgradeProgress>? progress = null)
     {
         lock (_gate)
         {
@@ -403,11 +417,18 @@ WHERE id = COALESCE(
             var currentVersion = ReadSchemaVersion(connection);
             Mark($"读版本(v{currentVersion})");
 
+            var pending = Migrations.Where(m => m.Version > currentVersion).ToList();
+            var totalSteps = pending.Count + 1;   // +1 = 补齐结构这一步
+            var completed = 0;
+            void Report(string detail) => progress?.Report(new DatabaseUpgradeProgress(++completed, totalSteps, detail));
+
             // 快路径：版本已是最新且核心对象都在 → 跳过整份 SchemaSql。
             // 老版本每次启动都重跑两百多条 CREATE ... IF NOT EXISTS，在慢盘 / 冷缓存
             // 的机器上光这一项就能吃掉几十秒，而结构其实早就齐了。
             if (currentVersion < SchemaVersion || !CoreSchemaPresent(connection))
             {
+                Report("准备数据结构（补齐缺失的表与索引）");
+
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText = SchemaSql;
@@ -416,7 +437,7 @@ WHERE id = COALESCE(
 
                 Mark("建表索引");
 
-                ApplyMigrations(connection, currentVersion);
+                ApplyMigrations(connection, pending, Report);
                 Mark("迁移");
             }
             else
@@ -463,17 +484,27 @@ WHERE (type = 'table' AND name IN ('messages', 'folders', 'accounts', 'attachmen
         return int.TryParse(query.ExecuteScalar() as string, out var version) ? version : 0;
     }
 
-    private static void ApplyMigrations(SqliteConnection connection, int currentVersion)
+    private static void ApplyMigrations(
+        SqliteConnection connection,
+        IReadOnlyList<(int Version, string Name, Action<SqliteConnection, SqliteTransaction> Apply)> pending,
+        Action<string> report)
     {
-        foreach (var migration in Migrations)
+        if (pending.Count == 0) return;
+
+        // 升级期间放松落盘：整批迁移放在一个事务里，最贵的是「加生成列 + 建索引」这种全表扫描。
+        // WAL + synchronous=OFF 能省掉大量 fsync（机械盘上实测占大头）；进程中途被杀时该事务整体回滚，
+        // 版本号没提交，下次启动从原版本重试，不会留半套结构。
+        Execute(connection, "PRAGMA synchronous=OFF; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-131072;");
+        try
         {
-            if (migration.Version <= currentVersion) continue;
-
             using var tx = connection.BeginTransaction();
-            migration.Apply(connection, tx);
 
-            using (var mark = connection.CreateCommand())
+            foreach (var migration in pending)
             {
+                report($"更新数据结构：{DescribeMigration(migration.Name)}");
+                migration.Apply(connection, tx);
+
+                using var mark = connection.CreateCommand();
                 mark.Transaction = tx;
                 mark.CommandText =
                     "INSERT INTO meta(key, value) VALUES('schema_version', @version) " +
@@ -484,7 +515,39 @@ WHERE (type = 'table' AND name IN ('messages', 'folders', 'accounts', 'attachmen
 
             tx.Commit();
         }
+        finally
+        {
+            // 恢复连接默认值（工厂里的 ApplyPragmas 是 WAL + synchronous=NORMAL）
+            Execute(connection, "PRAGMA synchronous=NORMAL; PRAGMA temp_store=DEFAULT; PRAGMA cache_size=-16384;");
+        }
     }
+
+    private static void Execute(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>迁移步骤的中文说明（升级进度窗口展示用）；未登记的走英文名。</summary>
+    private static string DescribeMigration(string name) => name switch
+    {
+        "PendingOperations" => "待发队列字段",
+        "MailRules" => "过滤规则表",
+        "TagsAndTodos" => "标签与待办表",
+        "FreightReferences" => "业务单号表",
+        "ShipmentCases" => "一票货案件表",
+        "FollowUps" => "等待回复表",
+        "MailTypeAndStage" => "邮件类型与阶段",
+        "TagShortcut" => "标签快捷键",
+        "TagAccountScope" => "标签按账户隔离",
+        "AccountFetchPolicy" => "账户收信策略",
+        "AccountPrimaryFlag" => "主账户标记",
+        "StrangerSender" => "陌生发件人标记",
+        "BounceMark" => "退信标记",
+        "ThreadKeyIndex" => "会话归并索引（全表重建，最慢的一步）",
+        _ => name
+    };
 
     /// <summary>补列前先查 pragma_table_info，保证迁移对已手工修补过的旧库同样安全。</summary>
     private static void EnsureColumn(

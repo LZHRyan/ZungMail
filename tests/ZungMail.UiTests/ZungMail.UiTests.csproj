@@ -115,6 +115,13 @@
     <None Include="..\..\src\ZungMail.App\Views\MailImageViewerWindow.xaml"
           Link="Views\MailImageViewerWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <!-- 老库升级：进度窗口结构与启动流程回归 -->
+    <None Include="..\..\src\ZungMail.App\Views\StartupUpgradeWindow.xaml"
+          Link="Views\StartupUpgradeWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\App.xaml.cs"
+          Link="Source\App.xaml.cs"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\ZungMail.App\App.xaml"
           Link="App.xaml"
           CopyToOutputDirectory="PreserveNewest" />
