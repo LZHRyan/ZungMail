@@ -34,6 +34,45 @@ public sealed class MimeMapperInlineImageTests
         Assert.Contains("file:///", result.Html, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// 正文里 base64 内嵌的截图（data:image/png;base64,…）要落盘并改成 file:///：
+    /// 8.3MB 的水单邮件就是这种写法（正文 6.77MB、57 张图），留在库里既占空间又拖慢渲染。
+    /// </summary>
+    [Fact]
+    public async Task 正文里的base64内嵌图落盘_并改写为本地文件()
+    {
+        using var paths = new TempPaths();
+        var message = new MimeMessage();
+
+        var png = new byte[2048];
+        for (var i = 0; i < png.Length; i++) png[i] = (byte)(i % 251);
+        var base64 = Convert.ToBase64String(png);
+
+        var builder = new BodyBuilder
+        {
+            HtmlBody = $"<p>尊敬的客户：</p><img src=\"data:image/png;base64,{base64}\"><p>提单见附件</p>"
+        };
+        message.Body = builder.ToMessageBody();
+
+        var detail = new EmailDetail { AccountId = 1, Id = 4 };
+        var result = await MimeMapper.ExtractBodyAsync(message, paths, detail, CancellationToken.None);
+
+        // 正文里不再有 base64，只剩本地文件引用，正文长度塌缩
+        Assert.DoesNotContain("base64", result.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("file:///", result.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.Html.Length < 400, $"正文应只剩引用，实际 {result.Html.Length} 字符");
+        Assert.Contains("提单见附件", result.Html);
+
+        // 落盘的文件是内嵌附件，导出 .eml / 转发内联都靠它
+        var inline = Assert.Single(result.Attachments);
+        Assert.True(inline.IsInline);
+        Assert.Equal("image/png", inline.ContentType);
+        Assert.Equal(png.Length, inline.Size);
+        Assert.NotNull(inline.LocalPath);
+        Assert.True(File.Exists(inline.LocalPath));
+        Assert.Equal(png, await File.ReadAllBytesAsync(inline.LocalPath!));
+    }
+
     [Fact]
     public async Task 普通附件仍按文件名保存()
     {

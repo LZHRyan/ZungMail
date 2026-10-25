@@ -46,6 +46,52 @@ public sealed class SummaryModelStoreTests : IDisposable
         return new SummaryModelStore(_settings, _root, NullLogger<SummaryModelStore>.Instance);
     }
 
+    private SummaryModelStore CreateStore(string? url, string? sha, HttpClient http)
+    {
+        _settings.Current.MailSummaryModelUrl = url ?? "";
+        _settings.Current.MailSummaryModelSha256 = sha ?? "";
+        return new SummaryModelStore(_settings, _root, NullLogger<SummaryModelStore>.Instance, http);
+    }
+
+    /// <summary>
+    /// 回归守护：ModelScope 对没有 User-Agent 的请求直接回 403（2026-10 实测无 UA→403、带 UA→206），
+    /// 而 .NET 的 HttpClient 默认不带 UA——用户那边就是「下载摘要模型失败：403 Forbidden」。
+    /// </summary>
+    [Fact]
+    public void 下载客户端自带UserAgent()
+    {
+        var store = CreateStore(null, null);
+        var field = typeof(SummaryModelStore).GetField(
+            "_http", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var http = Assert.IsType<HttpClient>(field!.GetValue(store));
+
+        Assert.NotEmpty(http.DefaultRequestHeaders.UserAgent);
+    }
+
+    [Fact]
+    public async Task 下载返回403时给出可操作的提示()
+    {
+        using var http = new HttpClient(new FixedStatusHandler(HttpStatusCode.Forbidden));
+        var store = CreateStore("https://example.com/model.gguf", null, http);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => store.DownloadAsync());
+
+        Assert.Contains("403", ex.Message);
+        Assert.Contains("本地 AI 助手", ex.Message);
+    }
+
+    /// <summary>固定返回一个状态码，模拟 403/404 这类「地址失效」。</summary>
+    private sealed class FixedStatusHandler : HttpMessageHandler
+    {
+        private readonly HttpStatusCode _status;
+
+        public FixedStatusHandler(HttpStatusCode status) => _status = status;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(_status));
+    }
+
     [Fact]
     public async Task 下载成功并校验通过()
     {

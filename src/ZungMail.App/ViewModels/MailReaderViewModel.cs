@@ -37,6 +37,9 @@ public sealed partial class MailReaderViewModel : ObservableObject
     /// <summary>本封邮件是否已放行远程图片（不持久化，切换邮件即复位）。</summary>
     private bool _loadRemoteImages;
 
+    /// <summary>正文文档缓存：小正文就地组装，大正文（如 8MB 的水单邮件）在线程池组装。</summary>
+    private readonly MailBodyDocumentCache _bodyDocument = new();
+
     /// <summary>窗口会话序号：窗口关闭时自增，用来丢弃关闭后才回来的加载结果。</summary>
     private int _session;
 
@@ -172,41 +175,64 @@ public sealed partial class MailReaderViewModel : ObservableObject
             .Select(a => a.LocalPath!)
             .ToList() ?? new List<string>();
 
-    /// <summary>正文 HTML 文档：主题、字号、远程图片开关与附件目录都参与组装。</summary>
-    public string BodyHtmlDocument
-    {
-        get
-        {
-            if (!UseHtmlRendering || Detail is null) return string.Empty;
-
-            var options = new MailDocumentOptions
-            {
-                IsDark = IsDark,
-                FontSize = BodyFontSize,
-                AllowRemoteImages = _loadRemoteImages || !_settings.Current.BlockRemoteImages,
-                FoldQuotedHistory = _settings.Current.FoldQuotedHistory,
-                FoldQuotedHistoryKeepLayers = _settings.Current.FoldQuotedHistoryKeepLayers,
-                EmlDirectory = EmlDirectory
-            };
-
-            // 探针：绑定 getter，每次求值整篇重建 HTML
-            using var scope = UiThreadProbe.Measure("正文组装（阅读窗口）");
-
-            if (string.IsNullOrWhiteSpace(Detail.BodyHtml) && string.IsNullOrWhiteSpace(Detail.BodyText))
-            {
-                return HtmlMailDocumentBuilder.Build("<p class=\"mail-empty\">（此邮件暂无正文内容）</p>", options);
-            }
-
-            return HtmlMailDocumentBuilder.Build(Detail, options);
-        }
-    }
+    /// <summary>正文 HTML 文档：主题、字号、远程图片开关与附件目录都参与组装（缓存 + 后台组装）。</summary>
+    public string BodyHtmlDocument => _bodyDocument.Document;
 
     /// <summary>正文含远程图片且尚未放行时，显示「显示图片」提示条。</summary>
     public bool ShowRemoteImagesPrompt => UseHtmlRendering
         && Detail is not null
         && !_loadRemoteImages
         && _settings.Current.BlockRemoteImages
-        && HtmlMailDocumentBuilder.ContainsRemoteImages(Detail.BodyHtml);
+        && _bodyDocument.HasRemoteImages;
+
+    /// <summary>
+    /// 重算正文文档：小正文就地组装，大正文交给线程池，组装好了再通知界面。
+    /// 以前这里是绑定 getter 里的同步组装，8MB 的邮件一开就占界面线程 200–300ms。
+    /// </summary>
+    private void RefreshBodyDocument()
+    {
+        if (!UseHtmlRendering || Detail is not { } detail)
+        {
+            _bodyDocument.Reset();
+            OnPropertyChanged(nameof(BodyHtmlDocument));
+            OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+            return;
+        }
+
+        var options = CreateBodyDocumentOptions();
+        var key = MailBodyDocumentFactory.BuildKey(detail, options);
+
+        if (detail.BodyHtml is null || detail.BodyHtml.Length <= MailBodyDocumentCache.InlineBuildMaxChars)
+        {
+            if (_bodyDocument.TryBuildInline(key, () => MailBodyDocumentFactory.Build(detail, options)))
+            {
+                OnPropertyChanged(nameof(BodyHtmlDocument));
+                OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+            }
+
+            return;
+        }
+
+        _ = BuildBodyDocumentAsync(detail, options, key);
+    }
+
+    private async Task BuildBodyDocumentAsync(EmailDetail detail, MailDocumentOptions options, string key)
+    {
+        // 结果回到界面线程后才赋值；被更新的请求取代时 BuildAsync 返回 false，不刷新界面
+        if (!await _bodyDocument.BuildAsync(key, () => MailBodyDocumentFactory.Build(detail, options)).ConfigureAwait(true))
+            return;
+
+        OnPropertyChanged(nameof(BodyHtmlDocument));
+        OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+    }
+
+    private MailDocumentOptions CreateBodyDocumentOptions() => MailBodyDocumentFactory.CreateOptions(
+        IsDark,
+        BodyFontSize,
+        _loadRemoteImages || !_settings.Current.BlockRemoteImages,
+        _settings.Current.FoldQuotedHistory,
+        _settings.Current.FoldQuotedHistoryKeepLayers,
+        EmlDirectory);
 
     /// <summary>正文区域是否显示正文：下载中先让位给加载占位，避免一大片空白。</summary>
     public bool ShowBodyView => !IsBodyLoading;
@@ -352,8 +378,7 @@ public sealed partial class MailReaderViewModel : ObservableObject
         OnPropertyChanged(nameof(BodyDisplay));
         OnPropertyChanged(nameof(SizeDisplayText));
         OnPropertyChanged(nameof(BodyHtmlSource));
-        OnPropertyChanged(nameof(BodyHtmlDocument));
-        OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+        RefreshBodyDocument();
         OnPropertyChanged(nameof(ShowDetailStranger));
         OnPropertyChanged(nameof(ShowDetailBounce));
         OnPropertyChanged(nameof(DetailBounceLine));
@@ -514,8 +539,7 @@ public sealed partial class MailReaderViewModel : ObservableObject
         if (_loadRemoteImages) return;
 
         _loadRemoteImages = true;
-        OnPropertyChanged(nameof(BodyHtmlDocument));
-        OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+        RefreshBodyDocument();
         StatusText = "已加载远程图片";
     }
 

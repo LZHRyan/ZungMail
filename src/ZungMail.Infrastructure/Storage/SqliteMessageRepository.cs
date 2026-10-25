@@ -566,18 +566,18 @@ SELECT id FROM messages WHERE folder_id = @folderId AND uid = @uid;
         return targets;
     }
 
-    public async Task<IReadOnlyList<(uint Uid, MessageFlags Flags)>> GetFlagsAsync(long folderId, uint minUidExclusive, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(long Id, uint Uid, MessageFlags Flags)>> GetFlagsAsync(long folderId, uint minUidExclusive, CancellationToken ct = default)
     {
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT uid, flags FROM messages WHERE folder_id = @folder AND uid > @minUid AND (flags & 32) = 0;";
+        command.CommandText = "SELECT id, uid, flags FROM messages WHERE folder_id = @folder AND uid > @minUid AND (flags & 32) = 0;";
         command.Parameters.AddWithValue("@folder", folderId);
         command.Parameters.AddWithValue("@minUid", (long)minUidExclusive);
-        var result = new List<(uint, MessageFlags)>();
+        var result = new List<(long, uint, MessageFlags)>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
-            result.Add(((uint)reader.GetInt64(0), (MessageFlags)SqlConvert.Int(reader, 1)));
+            result.Add((reader.GetInt64(0), (uint)reader.GetInt64(1), (MessageFlags)SqlConvert.Int(reader, 2)));
         }
         return result;
     }
@@ -768,6 +768,31 @@ VALUES(@messageId, @fileName, @contentType, @size, @inline, @localPath);
         command.CommandText = "DELETE FROM messages WHERE id = @id;";
         command.Parameters.AddWithValue("@id", id);
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<long>> GetInlineDataImageMessageIdsAsync(int limit, CancellationToken ct = default)
+    {
+        if (limit <= 0) return Array.Empty<long>();
+
+        await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        // 一次性回填用：LIKE 走不了索引，全表扫一遍，只在 meta 里没标记时调用一次
+        command.CommandText = """
+SELECT id FROM messages
+WHERE body_state = 1 AND body_html LIKE '%data:image/%base64,%'
+ORDER BY id
+LIMIT @limit;
+""";
+        command.Parameters.AddWithValue("@limit", limit);
+
+        var result = new List<long>();
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            result.Add(reader.GetInt64(0));
+        }
+
+        return result;
     }
 
     public async Task DeleteByFolderAsync(long folderId, CancellationToken ct = default)

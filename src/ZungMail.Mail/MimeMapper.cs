@@ -167,6 +167,38 @@ internal static class MimeMapper
             html = html.Replace("cid:" + cid, uri, StringComparison.OrdinalIgnoreCase);
         }
 
+        // 正文里 base64 内嵌的截图（data:image/png;base64,…）：落盘并改写成 file:///。
+        // 这类邮件正文动辄几 MB（实测一封 8.3MB 的水单邮件正文 6.77MB、57 张图），
+        // 留在库里会同时拖慢读库、搜索与渲染；落盘后正文只剩引用，
+        // 附件的呈现 / 转发内联 / 导出 .eml 都复用既有链路（IsInline 附件）。
+        html = MailBodyDataImageExtractor.ReplaceDataImages(html, (mimeType, bytes, inlineIndex) =>
+        {
+            try
+            {
+                Directory.CreateDirectory(directory);
+                var name = UniqueFileName($"inline-{inlineIndex}", 0, usedNames, mimeType, isInline: true);
+                var path = Path.Combine(directory, name);
+                File.WriteAllBytes(path, bytes);
+
+                attachments.Add(new AttachmentInfo
+                {
+                    EmailId = detail.Id,
+                    FileName = name,
+                    ContentType = mimeType,
+                    Size = bytes.Length,
+                    IsInline = true,
+                    LocalPath = path
+                });
+
+                return new Uri(path).AbsoluteUri;
+            }
+            catch (Exception)
+            {
+                // 磁盘满 / 权限问题：保持 data: 原样，正文仍能显示（只是文档大）
+                return null;
+            }
+        });
+
         if (string.IsNullOrEmpty(text) && !string.IsNullOrEmpty(html))
             text = HtmlTextExtractor.ToPlainText(html);
         if (string.IsNullOrEmpty(html) && !string.IsNullOrEmpty(text))

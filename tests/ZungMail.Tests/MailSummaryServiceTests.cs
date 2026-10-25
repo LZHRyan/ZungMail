@@ -111,6 +111,21 @@ INSERT INTO folders(id, account_id, full_name, display_name, kind) VALUES (1, 1,
         Assert.Equal(0, _rule.Calls);
     }
 
+    /// <summary>
+    /// 引擎必须在线程池跑：本机小模型首次加载权重（0.47GB GGUF）要几百毫秒到几秒，
+    /// 以前跟着调用方线程跑，界面线程就被拖住（实机日志里出现过 9.2 秒的占用）。
+    /// </summary>
+    [Fact]
+    public async Task 摘要引擎不在调用线程上执行()
+    {
+        var id = await AddMessageAsync(withBody: true);
+        _local.CaptureThread = true;
+
+        await _service.SummarizeAsync(id);
+
+        Assert.True(_local.CalledOnThreadPool, "摘要引擎应当在线程池线程执行，不能占用调用线程");
+    }
+
     [Fact]
     public async Task 本地不可用_自动降级规则抽取并带原因()
     {
@@ -240,6 +255,11 @@ INSERT INTO folders(id, account_id, full_name, display_name, kind) VALUES (1, 1,
 
         public int Calls { get; private set; }
 
+        /// <summary>记录「引擎在哪个线程上跑」，用于守护「不占用调用线程」。</summary>
+        public bool CaptureThread { get; set; }
+
+        public bool CalledOnThreadPool { get; private set; }
+
         public Task<MailSummaryProviderStatus> GetStatusAsync(CancellationToken ct = default)
             => Task.FromResult(new MailSummaryProviderStatus
             {
@@ -253,6 +273,7 @@ INSERT INTO folders(id, account_id, full_name, display_name, kind) VALUES (1, 1,
             CancellationToken ct = default)
         {
             Calls++;
+            if (CaptureThread) CalledOnThreadPool = Thread.CurrentThread.IsThreadPoolThread;
             if (Delay > TimeSpan.Zero) await Task.Delay(Delay, ct);
 
             return new MailSummaryResult

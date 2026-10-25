@@ -500,7 +500,7 @@ public sealed class ImapSyncService : IMailSyncService
                 var snapshotFloor = recentUids[0] > 0 ? recentUids[0] - 1 : 0u;
                 var localFlags = (await _messages.GetFlagsAsync(folder.Id, snapshotFloor, ct).ConfigureAwait(false))
                     .GroupBy(x => x.Uid)
-                    .ToDictionary(g => g.Key, g => g.First().Flags);
+                    .ToDictionary(g => g.Key, g => (g.First().Id, g.First().Flags));
                 var localFlagsMs = calibrationClock.ElapsedMilliseconds;
 
                 var pendingFlags = new List<(long Id, CoreFlags Flags)>();
@@ -529,10 +529,13 @@ public sealed class ImapSyncService : IMailSyncService
                         if (summary.Flags is null) continue;
 
                         var remoteFlags = MailkitMapping.ToLocalFlags(summary.Flags);
-                        if (!localFlags.TryGetValue(summary.Uid, out var current) || current == remoteFlags) continue;
 
-                        var existing = await _messages.FindByUidAsync(folder.Id, summary.Uid, ct).ConfigureAwait(false);
-                        if (existing is not null) pendingFlags.Add((existing.Id, remoteFlags));
+                        // 快照里已经带主键：命中即直接进待更新列表，不再对每封变化的邮件各查一次库
+                        // （大文件夹一轮能有两三百封变化，机械盘上就是每轮多几秒的同步时间）
+                        if (!localFlags.TryGetValue(summary.Uid, out var current) || current.Flags == remoteFlags)
+                            continue;
+
+                        pendingFlags.Add((current.Id, remoteFlags));
                     }
 
                     if (pendingFlags.Count > 0)

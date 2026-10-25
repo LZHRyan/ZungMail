@@ -39,6 +39,16 @@ public static class ServiceCollectionExtensions
             return initializer;
         });
 
+        // meta 表的通用键值（一次性回填的「已跑过」标记等）
+        services.AddSingleton<IAppMetadataStore>(sp =>
+        {
+            _ = sp.GetRequiredService<DatabaseInitializer>();
+            return new SqliteMetadataStore(sp.GetRequiredService<SqliteConnectionFactory>());
+        });
+
+        // 一次性回填：历史邮件正文里的 base64 内嵌图落盘（缩正文、缩库、加快渲染）
+        services.AddSingleton<InlineDataImageBackfillService>();
+
         // DPAPI 为默认实现；旧 AES-GCM 密文由同一实现的回落通道继续解密，下次保存自动升级。
         services.AddSingleton<ICredentialProtector, DpapiCredentialProtector>();
 

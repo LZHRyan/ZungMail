@@ -363,6 +363,8 @@ INSERT INTO folders(id, account_id, full_name, display_name, kind) VALUES (1, 1,
         var flags = await _messages.GetFlagsAsync(1, 0);
         Assert.Single(flags);
         Assert.Equal(30u, flags[0].Uid);
+        // 快照要带主键：同步端靠它直接批量更新，不再逐封点查询
+        Assert.True(flags[0].Id > 0);
     }
 
     [Fact]

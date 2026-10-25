@@ -280,6 +280,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private EmailDetail? _detail;
 
+    /// <summary>正文文档缓存：小正文就地组装，大正文（如 8MB 的水单邮件）在线程池组装。</summary>
+    private readonly MailBodyDocumentCache _bodyDocument = new();
+
     /// <summary>当前阅读邮件的标签，用于邮件头展示。</summary>
     [ObservableProperty]
     private IReadOnlyList<MailTag> _detailTags = Array.Empty<MailTag>();
@@ -1009,35 +1012,8 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _useHtmlRendering;
 
-    /// <summary>正文 HTML 文档：主题、字号、远程图片开关与附件目录都参与组装。</summary>
-    public string BodyHtmlDocument
-    {
-        get
-        {
-            if (!UseHtmlRendering || Detail is null) return string.Empty;
-
-            var options = new MailDocumentOptions
-            {
-                IsDark = IsDark,
-                FontSize = BodyFontSize,
-                AllowRemoteImages = _loadRemoteImages || !_settings.Current.BlockRemoteImages,
-                FoldQuotedHistory = _settings.Current.FoldQuotedHistory,
-                FoldQuotedHistoryKeepLayers = _settings.Current.FoldQuotedHistoryKeepLayers,
-                EmlDirectory = _emlDirectory
-            };
-
-            // 探针：这是绑定 getter，每次求值都整篇重建 HTML
-            using var scope = UiThreadProbe.Measure("正文组装");
-
-            // 与纯文本回退保持一致的占位文案，避免空白页
-            if (string.IsNullOrWhiteSpace(Detail.BodyHtml) && string.IsNullOrWhiteSpace(Detail.BodyText))
-            {
-                return HtmlMailDocumentBuilder.Build("<p class=\"mail-empty\">（此邮件暂无正文内容）</p>", options);
-            }
-
-            return HtmlMailDocumentBuilder.Build(Detail, options);
-        }
-    }
+    /// <summary>正文 HTML 文档：主题、字号、远程图片开关与附件目录都参与组装（缓存 + 后台组装）。</summary>
+    public string BodyHtmlDocument => _bodyDocument.Document;
 
     /// <summary>原始正文 HTML，供纯文本回退位面转换为富文本。</summary>
     public string BodyHtmlSource => Detail?.BodyHtml ?? string.Empty;
@@ -1050,15 +1026,60 @@ public sealed partial class MainViewModel : ObservableObject
         && Detail is not null
         && !_loadRemoteImages
         && _settings.Current.BlockRemoteImages
-        && HtmlMailDocumentBuilder.ContainsRemoteImages(Detail.BodyHtml);
+        && _bodyDocument.HasRemoteImages;
 
-    partial void OnUseHtmlRenderingChanged(bool value)
+    /// <summary>
+    /// 重算正文文档：小正文就地组装（几毫秒），大正文交给线程池，组装好了再通知界面。
+    /// 以前这里是绑定 getter 里的同步组装，8MB 的邮件一开就占界面线程 200–300ms。
+    /// </summary>
+    private void RefreshBodyDocument()
     {
+        if (!UseHtmlRendering || Detail is not { } detail)
+        {
+            _bodyDocument.Reset();
+            OnPropertyChanged(nameof(BodyHtmlDocument));
+            OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+            return;
+        }
+
+        var options = CreateBodyDocumentOptions();
+        var key = MailBodyDocumentFactory.BuildKey(detail, options);
+
+        if (detail.BodyHtml is null || detail.BodyHtml.Length <= MailBodyDocumentCache.InlineBuildMaxChars)
+        {
+            if (_bodyDocument.TryBuildInline(key, () => MailBodyDocumentFactory.Build(detail, options)))
+            {
+                OnPropertyChanged(nameof(BodyHtmlDocument));
+                OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+            }
+
+            return;
+        }
+
+        _ = BuildBodyDocumentAsync(detail, options, key);
+    }
+
+    private async Task BuildBodyDocumentAsync(EmailDetail detail, MailDocumentOptions options, string key)
+    {
+        // 结果回到界面线程后才赋值；被更新的请求取代时 BuildAsync 返回 false，不刷新界面
+        if (!await _bodyDocument.BuildAsync(key, () => MailBodyDocumentFactory.Build(detail, options)).ConfigureAwait(true))
+            return;
+
         OnPropertyChanged(nameof(BodyHtmlDocument));
         OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
     }
 
-    partial void OnIsDarkChanged(bool value) => OnPropertyChanged(nameof(BodyHtmlDocument));
+    private MailDocumentOptions CreateBodyDocumentOptions() => MailBodyDocumentFactory.CreateOptions(
+        IsDark,
+        BodyFontSize,
+        _loadRemoteImages || !_settings.Current.BlockRemoteImages,
+        _settings.Current.FoldQuotedHistory,
+        _settings.Current.FoldQuotedHistoryKeepLayers,
+        _emlDirectory);
+
+    partial void OnUseHtmlRenderingChanged(bool value) => RefreshBodyDocument();
+
+    partial void OnIsDarkChanged(bool value) => RefreshBodyDocument();
 
     /// <summary>同步期间账户右键里的「收取」要跟着置灰，避免重复点；刷新按钮的说明也换成同步中。</summary>
     partial void OnIsSyncingChanged(bool value)
@@ -1085,8 +1106,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (_loadRemoteImages) return;
 
         _loadRemoteImages = true;
-        OnPropertyChanged(nameof(BodyHtmlDocument));
-        OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+        RefreshBodyDocument();
         StatusText = "已加载远程图片";
     }
 
@@ -2045,8 +2065,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(BodyDisplay));
         OnPropertyChanged(nameof(SizeDisplayText));
         OnPropertyChanged(nameof(BodyHtmlSource));
-        OnPropertyChanged(nameof(BodyHtmlDocument));
-        OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+        RefreshBodyDocument();
         OnPropertyChanged(nameof(ShowDetailLoading));
         OnPropertyChanged(nameof(ShowDetailPlaceholder));
         OnPropertyChanged(nameof(ShowDetailIndustryType));
@@ -3700,8 +3719,7 @@ public sealed partial class MainViewModel : ObservableObject
         UseHtmlRendering = _settings.Current.HtmlRendering;
         OnPropertyChanged(nameof(BodyFontSize));
         OnPropertyChanged(nameof(BodyHtmlSource));
-        OnPropertyChanged(nameof(BodyHtmlDocument));
-        OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
+        RefreshBodyDocument();
 
         // 货代开关：关闭的项立即清空看板并隐藏入口；重新开启的项清掉补扫进度、重新排队抽取
         var freightAfter = FreightFlags;
@@ -3903,7 +3921,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (IsSearchResults || CurrentPage > 1 || ConversationMode || _pinnedEmailId is not null) return;
         if (Messages.Count == 0) return;
 
-        var page = await _messages.QueryAsync(BuildQuery(0));
+        var page = await Task.Run(() => _messages.QueryAsync(BuildQuery(0)));
         var rows = page.Items.Select(summary => new MailRow(summary, avatars: _avatars)).ToList();
         if (rows.Count == 0) return;
 
@@ -3973,11 +3991,25 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task ReloadAccountsAsync()
     {
-        var accounts = await _accounts.GetAllAsync();
+        // 三次查询一次性丢给线程池：Microsoft.Data.Sqlite 的 *Async 底层同步执行，
+        // 直接在界面线程 await 等于把这几条 SQL（2.9GB 库落在机械盘上时更明显）跑在界面线程。
+        // 这个方法每轮后台同步（有新信 / 标志位变化）都会被调用，是「每分钟一卡」的常见来源。
+        var (accounts, localCounts, folderMap) = await Task.Run(async () =>
+        {
+            var list = await _accounts.GetAllAsync();
 
-        // 侧栏角标统一用本地口径（与列表一致）：服务器 STATUS 的未读数可能还算着
-        // 「本地已经移走 / 删除、只是服务器还没 EXPUNGE」的邮件，会出现「0 封却挂 1」。
-        var localCounts = await _messages.GetFolderCountsAsync();
+            // 侧栏角标统一用本地口径（与列表一致）：服务器 STATUS 的未读数可能还算着
+            // 「本地已经移走 / 删除、只是服务器还没 EXPUNGE」的邮件，会出现「0 封却挂 1」。
+            var counts = await _messages.GetFolderCountsAsync();
+
+            var map = new Dictionary<long, IReadOnlyList<MailFolder>>();
+            foreach (var account in list)
+            {
+                map[account.Id] = await _folders.GetByAccountAsync(account.Id);
+            }
+
+            return (list, counts, map);
+        });
 
         for (var i = Accounts.Count - 1; i >= 0; i--)
         {
@@ -3993,7 +4025,9 @@ public sealed partial class MainViewModel : ObservableObject
                 Accounts.Add(node);
             }
 
-            var folders = await _folders.GetByAccountAsync(account.Id);
+            var folders = folderMap.TryGetValue(account.Id, out var cached)
+                ? cached
+                : Array.Empty<MailFolder>();
             // 账户被停用后，若当前正停在其文件夹上，自动回到统一收件箱，避免停留在不再更新的列表。
             if (!account.IsEnabled && _currentFolder is { } current && current.AccountId == account.Id)
             {
@@ -4072,7 +4106,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            PendingSyncCount = await _mailActions.GetPendingCountAsync();
+            // 仓储调用一律在线程池执行（SQLite 的 async 底层是同步的）
+            PendingSyncCount = await Task.Run(() => _mailActions.GetPendingCountAsync());
         }
         catch (Exception ex)
         {
@@ -4094,8 +4129,16 @@ public sealed partial class MainViewModel : ObservableObject
     private static void OnUi(Action action)
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess()) action();
-        else dispatcher.Invoke(action);
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        // 后台线程只把动作排队，不同步等界面线程：同步进度每批都会触发，
+        // 以前用 Invoke 会让 IMAP 线程在这里被界面拖住（界面忙 1 秒，同步就停 1 秒），
+        // 界面线程若正等这条同步链就有死锁风险。
+        dispatcher.BeginInvoke(DispatcherPriority.Normal, action);
     }
 }
 

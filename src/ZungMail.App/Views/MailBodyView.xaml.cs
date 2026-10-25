@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ZungMail.App.Services;
 using ZungMail.Core.Services;
+using ZungMail.Infrastructure.Logging;
 using Microsoft.Web.WebView2.Core;
 
 namespace ZungMail.App.Views;
@@ -25,9 +27,19 @@ public partial class MailBodyView : UserControl
 {
     private const string VirtualHost = HtmlMailDocumentBuilder.DefaultVirtualHost;
 
+    /// <summary>大正文写文件后导航用的虚拟主机（映射到 <see cref="MapBodyFolder"/> 建的目录）。</summary>
+    private const string BodyVirtualHost = "zungmailbody.example";
+
     private CoreWebView2Environment? _environment;
     private bool _initialized;
     private bool _failed;
+
+    /// <summary>大正文落盘的目录（<see cref="BodyVirtualHost"/> 映射的本地路径）；映射失败时为 null。</summary>
+    private string? _bodyDirectory;
+
+    /// <summary>本实例复用的正文文件：每封邮件覆盖写，用一个递增查询串绕开浏览器缓存。</summary>
+    private string? _bodyFilePath;
+    private int _bodyFileVersion;
 
     /// <summary>WebView2 已释放（宿主窗口关闭后），禁止再初始化或访问内核。</summary>
     private bool _browserReleased;
@@ -40,6 +52,9 @@ public partial class MailBodyView : UserControl
 
     /// <summary>降级文档重建已排队，避免正文与图片列表连续变更时重复解码。</summary>
     private bool _plainDocumentQueued;
+
+    /// <summary>「图片双击已启用」只记一次日志，免得每封邮件刷一行。</summary>
+    private static bool _imageScriptReadyLogged;
 
     public MailBodyView()
     {
@@ -231,6 +246,8 @@ public partial class MailBodyView : UserControl
         {
             // 释放失败交给进程退出兜底，不影响窗口关闭
         }
+
+        DeleteBodyFile();
     }
 
     private async Task EnsureCoreAsync()
@@ -256,6 +273,8 @@ public partial class MailBodyView : UserControl
             ApplySecuritySettings(core);
 
             core.NavigationStarting += OnNavigationStarting;
+            core.NavigationCompleted += OnNavigationCompleted;
+            core.WebMessageReceived += OnWebMessageReceived;
             core.NewWindowRequested += OnNewWindowRequested;
             core.ContextMenuRequested += OnContextMenuRequested;
             core.ProcessFailed += OnProcessFailed;
@@ -267,6 +286,8 @@ public partial class MailBodyView : UserControl
                     VirtualHost, eml, CoreWebView2HostResourceAccessKind.DenyCors);
             }
 
+            MapBodyFolder(core, userDataFolder);
+
             _initialized = true;
             UpdateMode();
         }
@@ -274,6 +295,66 @@ public partial class MailBodyView : UserControl
         {
             Fail();
         }
+    }
+
+    /// <summary>
+    /// 把「组装好的正文文档」目录映射成虚拟主机。
+    ///
+    /// <c>NavigateToString</c> 的实参上限是 2MB（WebView2 官方文档），8MB 的邮件必然抛异常；
+    /// 大正文改成写文件 + <c>Navigate</c>，解析排版交给渲染进程，界面线程只花几毫秒写盘。
+    /// </summary>
+    private void MapBodyFolder(CoreWebView2 core, string userDataFolder)
+    {
+        try
+        {
+            var directory = Path.Combine(userDataFolder, "body");
+            Directory.CreateDirectory(directory);
+            SweepStaleBodyFiles(directory);
+
+            core.SetVirtualHostNameToFolderMapping(
+                BodyVirtualHost, directory, CoreWebView2HostResourceAccessKind.DenyCors);
+
+            _bodyDirectory = directory;
+        }
+        catch (Exception ex)
+        {
+            // 映射失败不致命：大正文退回纯文本（小正文照旧走 NavigateToString）
+            _bodyDirectory = null;
+            AppLog.Warn("正文目录映射失败，大正文将显示为纯文本：" + ex.Message);
+        }
+    }
+
+    /// <summary>清掉上次异常退出留下的正文文件（只删一天前的，避免误删其它实例正在用的）。</summary>
+    private static void SweepStaleBodyFiles(string directory)
+    {
+        try
+        {
+            var limit = DateTime.UtcNow.AddDays(-1);
+            foreach (var file in Directory.EnumerateFiles(directory, "body-*.html"))
+            {
+                if (File.GetLastWriteTimeUtc(file) < limit) File.Delete(file);
+            }
+        }
+        catch (Exception)
+        {
+            // 清理失败只影响临时文件体积，不影响阅读
+        }
+    }
+
+    private void DeleteBodyFile()
+    {
+        if (_bodyFilePath is null) return;
+
+        try
+        {
+            File.Delete(_bodyFilePath);
+        }
+        catch (Exception)
+        {
+            // 文件被占用：留给下次启动的过期清理
+        }
+
+        _bodyFilePath = null;
     }
 
     /// <summary>打印当前正文：调用 WebView2 原生打印对话框，保持与阅读时一致的排版。</summary>
@@ -295,12 +376,15 @@ public partial class MailBodyView : UserControl
     /// 九项安全设置：邮件正文视为不可信内容，除排版与选中复制外一律关闭。
     /// 右键菜单保持「可请求」状态，但宿主在 <see cref="OnContextMenuRequested"/> 中全部接管，
     /// 用户只会看到自建的「复制 / 全选」。
+    ///
+    /// 脚本仍然关闭（邮件自带的 &lt;script&gt; 与 on* 属性执行不了）；只打开「页面 → 宿主」的消息通道，
+    /// 供宿主注入的双击脚本回传被双击的图片地址，见 <see cref="MailBodyImageScript"/>。
     /// </summary>
     private static void ApplySecuritySettings(CoreWebView2 core)
     {
         var settings = core.Settings;
         settings.IsScriptEnabled = false;
-        settings.IsWebMessageEnabled = false;
+        settings.IsWebMessageEnabled = true;
         settings.AreHostObjectsAllowed = false;
         settings.AreDefaultScriptDialogsEnabled = false;
         settings.IsBuiltInErrorPageEnabled = false;
@@ -338,13 +422,27 @@ public partial class MailBodyView : UserControl
     /// <summary>构建降级位面的只读文档：优先把 HTML 转成富文本，失败时退化为纯文本 + 末尾图片。</summary>
     private void BuildPlainDocument()
     {
-        if (HtmlFlowDocumentBuilder.TryBuild(HtmlSource, IsDark, BodyFontSize, out var htmlDocument))
+        var html = HtmlSource;
+
+        // 几 MB 的正文交给 WPF 富文本要一两秒（FlowDocument 逐元素构建，实测 6.8MB ≈ 1.7–3.1s），
+        // 而且会被重建两次（渲染失败一次、正文属性变更排队又一次）——这里按体积止损，直接排纯文本。
+        var richAllowed = MailBodyRenderPolicy.AllowRichFallback(html);
+
+        if (richAllowed && HtmlFlowDocumentBuilder.TryBuild(html, IsDark, BodyFontSize, out var htmlDocument))
         {
             PlainTextHost.Document = htmlDocument;
             return;
         }
 
         var document = new FlowDocument { PagePadding = new Thickness(0) };
+
+        if (!richAllowed)
+        {
+            document.Blocks.Add(new Paragraph(new Run(MailBodyRenderPolicy.LargeBodyFallbackNotice))
+            {
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+        }
 
         var lines = (PlainText ?? string.Empty)
             .Replace("\r\n", "\n")
@@ -403,15 +501,40 @@ public partial class MailBodyView : UserControl
         try
         {
             ApplyBackgroundColor();
+
+            using var scope = UiThreadProbe.Measure("正文渲染");
+
+            // 超过 NavigateToString 的 2MB 上限：写文件后按 URL 导航，避免每次都抛异常再退回纯文本
+            if (_bodyDirectory is not null && MailBodyRenderPolicy.NeedsFileNavigation(document))
+            {
+                var url = WriteBodyFile(document);
+                _pendingSelfNavigations++;
+                Browser.CoreWebView2.Navigate(url);
+                return;
+            }
+
             _pendingSelfNavigations++;
             Browser.CoreWebView2.NavigateToString(document);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             if (_pendingSelfNavigations > 0) _pendingSelfNavigations--;
-            // 文档过大或内核异常：本封邮件退回纯文本，不影响其它邮件
-            Fail();
+            // 以前这里静默吞掉：大邮件每次都失败，日志里却一条记录都没有
+            Fail(ex);
         }
+    }
+
+    /// <summary>
+    /// 把组装好的文档写成文件并返回虚拟主机地址。
+    /// 同一个控件复用一份文件（每封邮件覆盖写），浏览器缓存用递增查询串绕开，避免临时文件堆积。
+    /// </summary>
+    private string WriteBodyFile(string document)
+    {
+        _bodyFilePath ??= Path.Combine(_bodyDirectory!, "body-" + Guid.NewGuid().ToString("N") + ".html");
+        File.WriteAllText(_bodyFilePath, document, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+        _bodyFileVersion++;
+        return $"https://{BodyVirtualHost}/{Path.GetFileName(_bodyFilePath)}?v={_bodyFileVersion}";
     }
 
     private void ApplyBackgroundColor()
@@ -419,9 +542,16 @@ public partial class MailBodyView : UserControl
             ? System.Drawing.Color.FromArgb(0x16, 0x1B, 0x23)
             : System.Drawing.Color.White;
 
-    private void Fail()
+    private void Fail(Exception? error = null)
     {
         if (_browserReleased) return;
+
+        if (error is not null)
+        {
+            // 大邮件曾被这条静默吞掉的异常一路带到降级位面（NavigateToString 的 2MB 上限），
+            // 出问题时至少要能在日志里看到原因
+            AppLog.Warn($"正文 HTML 渲染失败，已退回纯文本：{error.GetType().Name}: {error.Message}");
+        }
 
         _failed = true;
         _pendingSelfNavigations = 0;
@@ -489,6 +619,14 @@ public partial class MailBodyView : UserControl
 
         if (Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri))
         {
+            // 大正文的本地文件导航（见 MapBodyFolder）：算自身导航，放行并销账
+            if (uri.Scheme == Uri.UriSchemeHttps &&
+                string.Equals(uri.Host, BodyVirtualHost, StringComparison.OrdinalIgnoreCase))
+            {
+                if (_pendingSelfNavigations > 0) _pendingSelfNavigations--;
+                return;
+            }
+
             if (uri.Scheme == Uri.UriSchemeHttps &&
                 string.Equals(uri.Host, VirtualHost, StringComparison.OrdinalIgnoreCase))
             {
@@ -522,6 +660,108 @@ public partial class MailBodyView : UserControl
     private void OnProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e) => Fail();
 
     /// <summary>
+    /// 导航完成（<c>NavigateToString</c> 与正文文件导航都算）后注入「双击图片」脚本。
+    /// 脚本本身不含邮件内容，只把被双击的图片地址回传给宿主，所以每次导航重新注入即可。
+    /// </summary>
+    private async void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        if (!e.IsSuccess || _browserReleased) return;
+
+        try
+        {
+            var core = Browser.CoreWebView2;
+            if (core is null) return;
+
+            await core.ExecuteScriptAsync(MailBodyImageScript.Inject);
+            if (_browserReleased) return;
+
+            // 只在没生效时说话：脚本被内核拒绝（例如脚本整体禁用）会在这里暴露
+            var applied = await core.ExecuteScriptAsync("window." + MailBodyImageScript.Marker);
+            if (!string.Equals((applied ?? string.Empty).Trim().Trim('"'), "1", StringComparison.Ordinal))
+            {
+                AppLog.Warn($"正文图片双击脚本未生效（返回 {applied}），图片无法双击放大");
+            }
+            else if (!_imageScriptReadyLogged)
+            {
+                // 每个进程记一次即可：用于确认「脚本禁用 + 宿主注入」这条路真的走通了
+                _imageScriptReadyLogged = true;
+                AppLog.Info("正文图片双击已启用（双击正文图片可放大查看）");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("正文图片双击脚本注入失败：" + ex.Message);
+        }
+    }
+
+    /// <summary>正文脚本回传：用户双击了图片 → 取图片字节并打开放大查看窗口。</summary>
+    private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        MailBodyImageMessage? message;
+        try
+        {
+            message = MailBodyImageMessage.TryParse(e.WebMessageAsJson);
+        }
+        catch (Exception)
+        {
+            // 不是 JSON 的消息（理论上不会出现）：与正文无关，忽略
+            return;
+        }
+
+        if (message is null) return;
+        if (!Uri.TryCreate(message.Source, UriKind.Absolute, out var uri)) return;
+
+        await OpenImageViewerAsync(uri, message.AltText);
+    }
+
+    /// <summary>
+    /// 打开「查看大图」窗口：双击正文图片和右键「查看大图」共用这一条路径，
+    /// 取字节（data: / 虚拟主机 / 网络）、解码、按宿主窗口居中弹出。
+    /// </summary>
+    private async Task OpenImageViewerAsync(Uri imageUri, string? altText)
+    {
+        var bytes = await TryReadUriAsync(imageUri);
+        if (bytes is null || bytes.Length == 0)
+        {
+            AppLog.Warn($"正文图片读取失败，无法放大查看：{imageUri.Scheme}");
+            return;
+        }
+
+        if (_browserReleased) return;
+
+        var image = TryDecodeImage(bytes);
+        if (image is null) return;
+
+        var fileName = imageUri.Scheme == "data" ? "image" : Path.GetFileNameWithoutExtension(imageUri.AbsolutePath);
+        if (string.IsNullOrWhiteSpace(fileName)) fileName = "image";
+
+        var window = new MailImageViewerWindow(image, bytes, fileName, altText);
+        if (Window.GetWindow(this) is { } owner && !ReferenceEquals(owner, window)) window.Owner = owner;
+        window.Show();
+    }
+
+    /// <summary>把图片字节解码成可冻结的位图；不是图片或解码失败时返回 null。</summary>
+    private static BitmapSource? TryDecodeImage(byte[] bytes)
+    {
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+            image.StreamSource = stream;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 正文右键菜单：默认菜单已关闭，这里只提供「复制 / 全选」。
     /// 页面脚本处于禁用状态，右键不会触发邮件自带行为。
     /// </summary>
@@ -553,10 +793,11 @@ public partial class MailBodyView : UserControl
             AddSeparator(menu);
         }
 
-        // 图片：图片另存为 / 复制图片
+        // 图片：查看大图（等同双击）/ 图片另存为 / 复制图片
         if (target.Kind == CoreWebView2ContextMenuTargetKind.Image
             && Uri.TryCreate(target.SourceUri, UriKind.Absolute, out var imageUri))
         {
+            AddMenuItem(menu, "查看大图", "双击", () => _ = OpenImageViewerAsync(imageUri, null));
             AddMenuItem(menu, "图片另存为…", null, () => _ = SaveUriAsync(imageUri));
             AddMenuItem(menu, "复制图片", null, () => _ = CopyImageAsync(imageUri));
             AddSeparator(menu);

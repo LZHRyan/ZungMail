@@ -198,7 +198,12 @@ public sealed class MailSummaryService : IMailSummaryService
 
             try
             {
-                var result = await provider.SummarizeAsync(request, progress, timeout.Token).ConfigureAwait(false);
+                // 引擎一律在线程池跑：本机小模型首次加载权重就要几百毫秒到几秒（0.47GB GGUF 从机械盘读），
+                // 推理再占满 6 个线程；以前这段直接跟着调用方线程跑，界面线程就被拖住
+                // （日志里出现过「摘要模型已加载」之后紧接 9234ms 的 UI 线程占用）。
+                var result = await Task
+                    .Run(() => provider.SummarizeAsync(request, progress, timeout.Token), timeout.Token)
+                    .ConfigureAwait(false);
                 elapsed.Stop();
 
                 var finalResult = new MailSummaryResult

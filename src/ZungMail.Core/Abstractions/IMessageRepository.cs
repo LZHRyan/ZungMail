@@ -61,8 +61,12 @@ public interface IMessageRepository
     Task<IReadOnlyList<(long Id, long FolderId, MessageFlags Flags)>> MarkAllSeenAsync(
         MessageQuery query, CancellationToken ct = default);
 
-    /// <summary>取某文件夹中 UID 大于给定值的所有 (uid, flags)，用于校准已读/星标。</summary>
-    Task<IReadOnlyList<(uint Uid, MessageFlags Flags)>> GetFlagsAsync(long folderId, uint minUidExclusive, CancellationToken ct = default);
+    /// <summary>
+    /// 取某文件夹中 UID 大于给定值的所有 (id, uid, flags)，用于校准已读/星标。
+    /// 带上 id 是为了让同步端在发现标志位变化时直接批量更新，
+    /// 不必再对每一封变化的邮件各查一次 (folder_id, uid)（大文件夹一轮能有几百次点查询）。
+    /// </summary>
+    Task<IReadOnlyList<(long Id, uint Uid, MessageFlags Flags)>> GetFlagsAsync(long folderId, uint minUidExclusive, CancellationToken ct = default);
 
     Task<uint> GetMaxUidAsync(long folderId, CancellationToken ct = default);
 
@@ -74,6 +78,13 @@ public interface IMessageRepository
         long folderId, DateTimeOffset? sinceUtc, int limit, CancellationToken ct = default);
 
     Task SaveBodyAsync(long id, string bodyHtml, string bodyText, IReadOnlyList<AttachmentInfo> attachments, CancellationToken ct = default);
+
+    /// <summary>
+    /// 找出正文里还带 base64 内嵌图（<c>data:image/…;base64,</c>）的邮件 id，按 id 升序、最多 <paramref name="limit"/> 条。
+    /// 供一次性回填把这些图片落盘并改写成 file:///（历史邮件在入库时还没有这一步）。
+    /// 这是一次全表 LIKE，只在回填时调用。
+    /// </summary>
+    Task<IReadOnlyList<long>> GetInlineDataImageMessageIdsAsync(int limit, CancellationToken ct = default);
 
     /// <summary>
     /// 回填退信细节（失败收件人 / SMTP 状态码 / 诊断）：正文下载后解析 delivery-status 才有值。

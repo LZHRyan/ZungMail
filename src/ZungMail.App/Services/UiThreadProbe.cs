@@ -31,6 +31,13 @@ public static class UiThreadProbe
 
     private static DispatcherTimer? _heartbeat;
 
+    /// <summary>
+    /// 当前正在执行的具名阶段（仅界面线程读写）。
+    /// 心跳迟到时把它写进日志：卡在某个阶段没返回，比「未归因」有用得多——
+    /// 之前 196 次卡顿里有 189 次是「未归因」，日志只能看出「卡了 56 秒」却不知道卡在哪。
+    /// </summary>
+    private static string? _currentStage;
+
     /// <summary>包住一段「同步占着 UI 线程」的代码，释放时按耗时写日志。非 UI 线程调用直接空转。</summary>
     public static IDisposable Measure(string stage) => new StageScope(stage);
 
@@ -55,7 +62,11 @@ public static class UiThreadProbe
         _lastHeartbeatMs = now;
 
         if (gap < WarnThresholdMs) return;
-        Log($"UI 线程占用 ~{gap}ms（未归因；检查是否有未包 Measure 的同步调用）", gap);
+
+        var stage = _currentStage;
+        Log(stage is null
+            ? $"UI 线程占用 ~{gap}ms（未归因；检查是否有未包 Measure 的同步调用）"
+            : $"UI 线程占用 ~{gap}ms（停在阶段：{stage}，该阶段还没返回）", gap);
     }
 
     private static bool OnUiThread()
@@ -83,6 +94,7 @@ public static class UiThreadProbe
         private readonly string _stage;
         private readonly long _startMs;
         private readonly bool _onUiThread;
+        private readonly string? _previousStage;
         private bool _done;
 
         public StageScope(string stage)
@@ -90,12 +102,18 @@ public static class UiThreadProbe
             _stage = stage;
             _onUiThread = OnUiThread();
             _startMs = _onUiThread ? Clock.ElapsedMilliseconds : 0;
+
+            // 登记当前阶段：心跳迟到时用来说明「卡在哪」，嵌套时按栈恢复
+            _previousStage = _onUiThread ? _currentStage : null;
+            if (_onUiThread) _currentStage = stage;
         }
 
         public void Dispose()
         {
             if (_done || !_onUiThread) return;
             _done = true;
+
+            _currentStage = _previousStage;
 
             var elapsed = Clock.ElapsedMilliseconds - _startMs;
             if (elapsed < InfoThresholdMs) return;

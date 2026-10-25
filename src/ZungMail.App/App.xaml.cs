@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 using ZungMail.Application.DependencyInjection;
+using ZungMail.Application.Services;
 using ZungMail.App.Services;
 using ZungMail.App.ViewModels;
 using ZungMail.App.Views;
@@ -239,10 +240,40 @@ public partial class App : System.Windows.Application
             StartupTrace.ProcessStartToEntryMs,
             string.Join(" · ", _startupStages));
 
+        // 一次性回填：历史邮件正文里的 base64 内嵌图落盘并改成 file:/// 引用。
+        // 首屏之后才跑（meta 里标记过就秒退），异常只记日志，不影响启动。
+        _ = BackfillInlineDataImagesAsync(_host.Services);
+
         if (settings.Current.SyncOnLaunch)
         {
             // 启动即增量同步，但不阻塞界面（同步引擎内部在后台线程执行）
             _ = viewModel.RefreshCommand.ExecuteAsync(null);
+        }
+    }
+
+    /// <summary>
+    /// 一次性回填历史邮件正文里的 base64 内嵌图（落盘 + 改写成 file:///）。
+    /// 放到线程池执行：整个过程会做一次全表扫描与若干次读库写盘，
+    /// 在机械盘上可能持续几十秒，绝不能占用界面线程。
+    /// </summary>
+    private static async Task BackfillInlineDataImagesAsync(IServiceProvider services)
+    {
+        try
+        {
+            await Task.Yield();
+
+            var backfill = services.GetRequiredService<InlineDataImageBackfillService>();
+            var (messages, savedChars) = await Task.Run(() => backfill.RunAsync()).ConfigureAwait(false);
+
+            if (messages > 0)
+            {
+                AppLog.Info($"内嵌图片回填完成：{messages} 封，正文减少 {savedChars:N0} 字符");
+            }
+        }
+        catch (Exception ex)
+        {
+            // 回填失败不影响使用：下次启动会重试（meta 标记只在跑完后才写）
+            AppLog.Warn("内嵌图片回填失败（下次启动会重试）：" + ex.Message);
         }
     }
 

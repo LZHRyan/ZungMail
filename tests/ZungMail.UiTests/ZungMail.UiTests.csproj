@@ -92,6 +92,13 @@
     <None Include="..\..\src\ZungMail.App\Views\MailSourceWindow.xaml"
           Link="Views\MailSourceWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <!-- 大正文渲染止损：解析正文控件源码，确认「写文件导航 + 降级体积门槛」没被删掉 -->
+    <None Include="..\..\src\ZungMail.App\Views\MailBodyView.xaml"
+          Link="Views\MailBodyView.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\Views\MailBodyView.xaml.cs"
+          Link="Source\MailBodyView.xaml.cs"
+          CopyToOutputDirectory="PreserveNewest" />
     <!-- 通讯录：搜索框观感与分页栏回归，直接解析窗口 XAML -->
     <None Include="..\..\src\ZungMail.App\Views\AddressBookWindow.xaml"
           Link="Views\AddressBookWindow.xaml"
@@ -103,6 +110,10 @@
     <!-- 历史邮件清理：仅清正文与附件的选项、按钮文案与说明回归 -->
     <None Include="..\..\src\ZungMail.App\Views\CleanupWindow.xaml"
           Link="Views\CleanupWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 正文图片双击放大：查看窗口结构回归（标题栏 / 缩放按钮 / 另存为） -->
+    <None Include="..\..\src\ZungMail.App\Views\MailImageViewerWindow.xaml"
+          Link="Views\MailImageViewerWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\ZungMail.App\App.xaml"
           Link="App.xaml"

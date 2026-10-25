@@ -44,7 +44,19 @@ public sealed class SummaryModelStore : ISummaryModelStore
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ZungMail"),
             "models");
 
-        _http = httpClient ?? new HttpClient { Timeout = TimeSpan.FromMinutes(60) };
+        _http = httpClient ?? CreateHttpClient();
+    }
+
+    /// <summary>
+    /// 下载客户端。必须带 User-Agent：ModelScope 对「没有 UA」的请求直接回 403
+    /// （2026-10 实测：无 UA → 403 Forbidden，带浏览器 UA → 206 Partial Content），
+    /// 而 .NET 的 HttpClient 默认不带 UA，用户那边就是「下载摘要模型失败：403」。
+    /// </summary>
+    private static HttpClient CreateHttpClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromMinutes(60) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZungMail/1.0 (Windows; model-download)");
+        return client;
     }
 
     public string ModelDirectory { get; }
@@ -119,7 +131,11 @@ public sealed class SummaryModelStore : ISummaryModelStore
             throw new IOException("服务器不支持续传，请重新开始下载。");
         }
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            // 403/404 以前只报「Response status code does not indicate success」，用户看不懂也不知道怎么办
+            throw new HttpRequestException(DescribeFailure(response.StatusCode), null, response.StatusCode);
+        }
 
         var total = response.Content.Headers.ContentLength is { } length ? length + resumeFrom : (long?)null;
         var append = resumeFrom > 0 && response.StatusCode == HttpStatusCode.PartialContent;
@@ -187,6 +203,19 @@ public sealed class SummaryModelStore : ISummaryModelStore
         InvalidateVerification();
         return GetStatus();
     }
+
+    /// <summary>下载失败时给用户能看到的话：说清是链接问题还是服务器问题，并指明下一步怎么做。</summary>
+    private static string DescribeFailure(HttpStatusCode status) => status switch
+    {
+        HttpStatusCode.Forbidden =>
+            "下载地址拒绝访问（403）：这个链接可能已失效或需要登录。请到 设置 → 本地 AI 助手 换一个下载地址，" +
+            "或手动把 GGUF 模型文件放进模型目录后点「重新检测」。",
+        HttpStatusCode.NotFound =>
+            "下载地址找不到文件（404）：链接里的文件名或版本可能已经变了，请换一个下载地址。",
+        HttpStatusCode.TooManyRequests => "下载被服务器限流（429）：稍等几分钟再试。",
+        _ when (int)status >= 500 => $"下载服务器出错（HTTP {(int)status}）：稍后再试，或换一个下载地址。",
+        _ => $"下载失败（HTTP {(int)status}）。"
+    };
 
     /// <summary>校验（按 路径+长度+修改时间 缓存结果，避免每次状态查询都算 400 MB 的哈希）。</summary>
     private (bool Ok, string? Detail) VerifyFile(string path, long size, bool force = false)
