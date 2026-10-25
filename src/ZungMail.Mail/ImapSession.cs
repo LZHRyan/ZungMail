@@ -142,6 +142,12 @@ public sealed class RemoteMessageSummary
 
     /// <summary>References 头（会话归并需要，Envelope 不含）。</summary>
     public string? References { get; init; }
+
+    /// <summary>
+    /// BODYSTRUCTURE 里的顶层结构是 <c>multipart/report; report-type=delivery-status</c>：
+    /// 这是标准退信（RFC 3464 DSN）的结构信号，比「发件人 + 主题」可靠。
+    /// </summary>
+    public bool IsDsnReport { get; init; }
 }
 
 /// <summary>默认实现：通过 <see cref="ImapConnector"/> 建立真实的 MailKit 连接。</summary>
@@ -385,7 +391,34 @@ internal sealed class MailKitImapFolder : IImapFolderSession
         HasAttachment = HasAttachment(summary),
         Envelope = summary.Envelope,
         References = summary.Headers?[HeaderId.References],
-        MdnTo = summary.Headers?[HeaderId.DispositionNotificationTo]
+        MdnTo = summary.Headers?[HeaderId.DispositionNotificationTo],
+        IsDsnReport = IsDsnReport(summary)
+    };
+
+    /// <summary>
+    /// 邮件结构里带 <c>message/delivery-status</c> 段时是退信报告（RFC 3464 DSN）。
+    /// 不能只看顶层 <c>multipart/report</c>：阅读收条（MDN）也是 multipart/report，
+    /// 但里面的段是 <c>message/disposition-notification</c>，必须靠段类型区分。
+    /// BODYSTRUCTURE 缺失或格式异常一律按「不是」处理，退信判定会走发件人 + 主题兜底。
+    /// </summary>
+    private static bool IsDsnReport(IMessageSummary summary)
+    {
+        try
+        {
+            return ContainsDeliveryStatus(summary.Body);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ContainsDeliveryStatus(BodyPart? part) => part switch
+    {
+        BodyPartMultipart multipart => multipart.BodyParts.Any(ContainsDeliveryStatus),
+        BodyPartMessage nested => ContainsDeliveryStatus(nested.Body),
+        null => false,
+        _ => string.Equals(part.ContentType?.MimeType, "message/delivery-status", StringComparison.OrdinalIgnoreCase)
     };
 
     /// <summary>BODYSTRUCTURE 缺失或格式异常时不影响同步，仅失去「是否有附件」的判定。</summary>

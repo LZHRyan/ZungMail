@@ -130,6 +130,12 @@ public sealed class AppSettings
     public bool MarkStrangerSenders { get; set; } = true;
 
     /// <summary>
+    /// 在列表与阅读区标记退信（投递失败退回，默认开）。
+    /// 判定结论在收信时写入本地库，关闭只影响展示，重新开启后立刻恢复。
+    /// </summary>
+    public bool MarkBounceMails { get; set; } = true;
+
+    /// <summary>
     /// 检测仿冒域名（钓鱼警示，默认开）：发件人域名与本机自有企业域名高度相似时标红提示。
     /// 判定在渲染时计算，所以开关与容差改动会立即作用于列表中的历史邮件。
     /// </summary>
@@ -137,6 +143,32 @@ public sealed class AppSettings
 
     /// <summary>仿冒域名相似度容差：1 = 只差一个字符即命中（默认），2 = 放宽到两个字符（更易误报）。</summary>
     public int PhishingDomainTolerance { get; set; } = Services.PhishingDomainPolicy.DefaultTolerance;
+
+    // ---------------- 邮件摘要（本地小模型） ----------------
+
+    /// <summary>
+    /// 是否使用本地 AI（本机小模型）：默认关闭——不加载模型、不占内存、不联网下载。
+    /// 关闭时「AI 总结」仍可用，只是改用规则抽取（关键词 / 单号 / 待处理事项）。
+    /// </summary>
+    public bool LocalAiEnabled { get; set; }
+
+    /// <summary>
+    /// 期望的摘要引擎：auto = 本地模型优先、不可用自动回落规则抽取；local-model；rule-based。
+    /// 引擎可插拔，这个值只是「首选」，不是唯一。
+    /// </summary>
+    public string MailSummaryProvider { get; set; } = "auto";
+
+    /// <summary>摘要长度档位：short | normal | detailed。</summary>
+    public string MailSummaryLength { get; set; } = "normal";
+
+    /// <summary>总结覆盖上限（字符）：超过会按段切分；再超出这个总上限的尾部不总结。</summary>
+    public int MailSummaryInputChars { get; set; } = 12000;
+
+    /// <summary>模型下载地址；留空表示使用内置默认地址。</summary>
+    public string MailSummaryModelUrl { get; set; } = "";
+
+    /// <summary>模型文件 SHA256（64 位十六进制）；留空表示使用内置默认值。</summary>
+    public string MailSummaryModelSha256 { get; set; } = "";
 
     // ---------------- 写信窗口 ----------------
 

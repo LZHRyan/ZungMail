@@ -219,6 +219,8 @@ public sealed class DialogService : IDialogService
             Get<UpdateWindowService>(),
             Get<IUpdateService>(),
             Get<IFeedbackService>(),
+            Get<ISummaryModelStore>(),
+            Get<IMailSummaryService>(),
             Get<ILogger<SettingsViewModel>>());
 
         if (!string.IsNullOrWhiteSpace(sectionKey))

@@ -49,11 +49,13 @@ public sealed class MailReaderViewModelTests : IDisposable
         services.AddSingleton<IAppPaths>(paths);
         services.AddSingleton<IImapClientFactory>(new FakeImapClientFactory(mailbox));
         services.AddSingleton<ThemeManager>();
-        services.AddSingleton<IDialogService, NullDialogService>();
+        services.AddSingleton<IDialogService, RecordingDialogService>();
         // 查看邮件源码窗口：测试里只记录调用，不创建真实窗口
         services.AddSingleton<IMailSourceWindowService>(new FakeMailSourceWindowService());
         services.AddSingleton<AttachmentActionService>();
         services.AddSingleton<AvatarStore>();
+        // 阅读区「AI 总结」子视图模型：与 App.OnStartup 保持一致（测试里不触发推理）
+        services.AddSingleton<MailSummaryViewModel>();
         services.AddSingleton<MailReaderViewModel>();
 
         _provider = services.BuildServiceProvider();
@@ -140,7 +142,7 @@ public sealed class MailReaderViewModelTests : IDisposable
 
         Assert.True(reader.CanReplyOrForward);
 
-        var dialogs = (NullDialogService)_provider.GetRequiredService<IDialogService>();
+        var dialogs = (RecordingDialogService)_provider.GetRequiredService<IDialogService>();
 
         await reader.ReplyCommand.ExecuteAsync(null);
         Assert.NotNull(dialogs.LastCompose);
@@ -228,9 +230,9 @@ public sealed class MailReaderViewModelTests : IDisposable
         });
     }
 
-    private sealed class NullDialogService : IDialogService
+    /// <summary>记录撰写请求的对话框替身：验证阅读窗口的回复 / 转发确实走了同一套装配。</summary>
+    private sealed class RecordingDialogService : IDialogService
     {
-        /// <summary>最近一次撰写请求：用来验证阅读窗口的回复 / 转发确实走了同一套装配。</summary>
         public ComposeRequest? LastCompose { get; private set; }
 
         public bool ShowCompose(ComposeRequest request)

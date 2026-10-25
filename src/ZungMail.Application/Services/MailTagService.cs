@@ -88,15 +88,13 @@ public sealed class MailTagService
     public Task AddToMessageAsync(long emailId, long tagId, CancellationToken ct = default)
         => _tags.AddToMessageAsync(emailId, tagId, ct);
 
-    /// <summary>批量打标签或批量移除。</summary>
+    /// <summary>批量打标签或批量移除：一次事务包住整批，避免逐封建连。</summary>
     public async Task ApplyAsync(IReadOnlyList<long> emailIds, long tagId, bool add, CancellationToken ct = default)
     {
-        foreach (var emailId in emailIds)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (add) await _tags.AddToMessageAsync(emailId, tagId, ct).ConfigureAwait(false);
-            else await _tags.RemoveFromMessageAsync(emailId, tagId, ct).ConfigureAwait(false);
-        }
+        if (emailIds.Count == 0) return;
+
+        if (add) await _tags.AddToMessagesAsync(tagId, emailIds, ct).ConfigureAwait(false);
+        else await _tags.RemoveFromMessagesAsync(tagId, emailIds, ct).ConfigureAwait(false);
     }
 
     /// <summary>

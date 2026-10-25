@@ -154,6 +154,46 @@ public sealed class DataDirectoryServiceTests : IDisposable
         Assert.True(result.WillBackupExisting);
     }
 
+    [Fact]
+    public async Task Validate_目标只剩上次留下的日志时通过()
+    {
+        // 复现用户现场：迁移失败一次后客户端把日志写进了目标目录，再次预检不能因此拒绝
+        CreateDatabase(DefaultDirectory, null, null);
+        Directory.CreateDirectory(Path.Combine(TargetDirectory, "logs"));
+        await File.WriteAllTextAsync(Path.Combine(TargetDirectory, "logs", "app-20261025.log"), "旧日志");
+
+        var result = await CreateService().ValidateTargetAsync(TargetDirectory);
+
+        Assert.True(result.Ok, result.Message);
+        Assert.False(result.WillBackupExisting);
+        Assert.Contains("清掉", result.Message);
+    }
+
+    [Fact]
+    public void ResolveEffective_有待迁移时仍用源目录()
+    {
+        // 指针里 DataDirectory 已是目标目录：启动阶段必须还落在源目录，否则日志会写进目标
+        Directory.CreateDirectory(TargetDirectory);
+        var pointer = CreatePointer();
+        pointer.Write(new DataDirectoryState { DataDirectory = TargetDirectory, PendingSource = DefaultDirectory });
+
+        Assert.Equal(DefaultDirectory, DataDirectoryPointer.ResolveEffective(pointer.Read()));
+    }
+
+    [Fact]
+    public void ResolveEffective_源目录不存在时退回目标目录()
+    {
+        Directory.CreateDirectory(TargetDirectory);
+        var pointer = CreatePointer();
+        pointer.Write(new DataDirectoryState
+        {
+            DataDirectory = TargetDirectory,
+            PendingSource = Path.Combine(_root, "gone")
+        });
+
+        Assert.Equal(TargetDirectory, DataDirectoryPointer.ResolveEffective(pointer.Read()));
+    }
+
     // ---------------- 迁移 ----------------
 
     [Fact]
@@ -213,6 +253,26 @@ public sealed class DataDirectoryServiceTests : IDisposable
         var backups = Directory.GetDirectories(_root, "moved_backup_*");
         Assert.Single(backups);
         Assert.Equal("old-db", await File.ReadAllTextAsync(Path.Combine(backups[0], "mail.db")));
+    }
+
+    [Fact]
+    public async Task Migrate_目标只有遗留日志时先清理再复制()
+    {
+        CreateDatabase(DefaultDirectory, null, null);
+
+        Directory.CreateDirectory(Path.Combine(TargetDirectory, "logs"));
+        await File.WriteAllTextAsync(Path.Combine(TargetDirectory, "logs", "old.log"), "旧日志");
+
+        var service = CreateService();
+        service.ScheduleMigration(TargetDirectory);
+        var result = await service.MigratePendingAsync();
+
+        Assert.True(result.Success, result.Message);
+        Assert.True(File.Exists(Path.Combine(TargetDirectory, "mail.db")));
+
+        // 遗留日志先被清掉；没被当成「已有数据」改名备份
+        Assert.False(File.Exists(Path.Combine(TargetDirectory, "logs", "old.log")));
+        Assert.Empty(Directory.GetDirectories(_root, "moved_backup_*"));
     }
 
     [Fact]

@@ -410,6 +410,108 @@ UPDATE meta SET value = '21' WHERE key = 'schema_version';
         Assert.Equal(1L, Convert.ToInt64(index.ExecuteScalar()));
     }
 
+    [Fact]
+    public void Initialize_版本22_退信四列补齐并回填历史退信()
+    {
+        var factory = CreateFactory();
+        new DatabaseInitializer(factory).Initialize();
+
+        // 造两封「升级前就存在」的来信（一封退信、一封普通），再把库回退成 v22 的样子：
+        // 去掉 v23 新增的四列并改回版本号，然后重新走一次升级。
+        using (var connection = factory.Create())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+INSERT INTO accounts(id, name, email, created_utc) VALUES(1, '工作', 'me@example.com', '2026-10-24T00:00:00Z');
+INSERT INTO folders(id, account_id, full_name, kind) VALUES(1, 1, 'INBOX', 1);
+INSERT INTO messages(account_id, folder_id, uid, from_email, subject, date_utc)
+VALUES(1, 1, 11, 'MAILER-DAEMON@263.net', '系统退信 [Undelivered Mail]', '2026-10-20T00:00:00.0000000+00:00');
+INSERT INTO messages(account_id, folder_id, uid, from_email, subject, date_utc)
+VALUES(1, 1, 12, 'postmaster@partner.com', '通讯录更新', '2026-10-20T00:00:00.0000000+00:00');
+ALTER TABLE messages DROP COLUMN bounce_detail;
+ALTER TABLE messages DROP COLUMN bounce_status;
+ALTER TABLE messages DROP COLUMN bounce_recipient;
+ALTER TABLE messages DROP COLUMN is_bounce;
+UPDATE meta SET value = '22' WHERE key = 'schema_version';
+-- v22 的库里不会有回填标记，删掉模拟真实的升级路径
+DELETE FROM meta WHERE key = 'backfill.bounce-marks.v1';
+""";
+            command.ExecuteNonQuery();
+        }
+
+        new DatabaseInitializer(factory).Initialize();
+
+        using var verify = factory.Create();
+
+        using (var column = verify.CreateCommand())
+        {
+            column.CommandText = """
+SELECT COUNT(*) FROM pragma_table_info('messages')
+WHERE name IN ('is_bounce', 'bounce_recipient', 'bounce_status', 'bounce_detail');
+""";
+            Assert.Equal(4L, Convert.ToInt64(column.ExecuteScalar()));
+        }
+
+        using (var bounced = verify.CreateCommand())
+        {
+            // 历史退信要回填成 1（细节留空，等正文下载再补）；普通来信保持 0
+            bounced.CommandText = "SELECT is_bounce, bounce_recipient FROM messages WHERE uid = 11;";
+            using var reader = bounced.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal(1L, reader.GetInt64(0));
+            Assert.Equal("", reader.GetString(1));
+        }
+
+        using var normal = verify.CreateCommand();
+        normal.CommandText = "SELECT is_bounce FROM messages WHERE uid = 12;";
+        Assert.Equal(0L, Convert.ToInt64(normal.ExecuteScalar()));
+    }
+
+    [Fact]
+    public void Initialize_版本24_会话键生成列与索引()
+    {
+        var factory = CreateFactory();
+        new DatabaseInitializer(factory).Initialize();
+
+        using var verify = factory.Create();
+
+        using (var column = verify.CreateCommand())
+        {
+            column.CommandText = "SELECT COUNT(*) FROM pragma_table_xinfo('messages') WHERE name = 'thread_key';";
+            Assert.Equal(1L, Convert.ToInt64(column.ExecuteScalar()));
+        }
+
+        using (var index = verify.CreateCommand())
+        {
+            index.CommandText =
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_messages_thread_key';";
+            Assert.Equal(1L, Convert.ToInt64(index.ExecuteScalar()));
+        }
+
+        using (var seed = verify.CreateCommand())
+        {
+            seed.CommandText = """
+INSERT INTO accounts(id, name, email, created_utc) VALUES (1, '测试', 'me@example.com', '2026-01-01T00:00:00.0000000+00:00');
+INSERT INTO folders(id, account_id, full_name, display_name, kind) VALUES (1, 1, 'INBOX', '收件箱', 1);
+INSERT INTO messages(account_id, folder_id, uid, message_id, thread_id, subject, date_utc, flags, size)
+VALUES (1, 1, 201, '<t1@x>', 'thread-1', '有会话', '2026-01-02T00:00:00.0000000+00:00', 1, 10);
+INSERT INTO messages(account_id, folder_id, uid, message_id, thread_id, subject, date_utc, flags, size)
+VALUES (1, 1, 202, '<t2@x>', '', '无会话', '2026-01-03T00:00:00.0000000+00:00', 1, 10);
+""";
+            seed.ExecuteNonQuery();
+        }
+
+        using var keys = verify.CreateCommand();
+        keys.CommandText = "SELECT id, thread_key FROM messages ORDER BY uid;";
+        using var reader = keys.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("thread-1", reader.GetString(1));
+        Assert.True(reader.Read());
+        // thread_id 为空时用 local:<id> 兜底，保证每封自成一组
+        Assert.Equal("local:" + reader.GetInt64(0).ToString(System.Globalization.CultureInfo.InvariantCulture), reader.GetString(1));
+        Assert.False(reader.Read());
+    }
+
     private SqliteConnectionFactory CreateFactory()
     {
         var paths = new AppPaths(_root);

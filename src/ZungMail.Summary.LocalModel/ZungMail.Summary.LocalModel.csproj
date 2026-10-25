@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>ZungMail.Summary.LocalModel</RootNamespace>
+    <AssemblyName>ZungMail.Summary.LocalModel</AssemblyName>
+    <!-- 这是一个「摘要引擎插件」：只依赖 Core 契约与 LLamaSharp，不引用 App / Application / WPF。 -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 本地推理：托管 API + CPU 原生后端（不需要 CUDA）。模型文件不进包，运行时按需下载。 -->
+    <PackageReference Include="LLamaSharp" Version="0.30.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZungMail.Core\ZungMail.Core.csproj" />
+  </ItemGroup>
+
+</Project>

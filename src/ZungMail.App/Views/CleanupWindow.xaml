@@ -24,8 +24,7 @@
                 <CheckBox Grid.Column="0"
                           VerticalAlignment="Center"
                           IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                          Checked="OnPreviewItemChecked"
-                          Unchecked="OnPreviewItemChecked" />
+                          Click="OnPreviewItemClick" />
 
                 <StackPanel Grid.Column="1" Margin="8,0,12,0">
                     <StackPanel Orientation="Horizontal">
@@ -241,6 +240,18 @@
                                        TextWrapping="Wrap"
                                        Text="草稿邮件始终排除，不会被清理。" />
 
+                            <Rectangle Height="1" Fill="{DynamicResource RuleBrush}" Margin="0,14,0,0" />
+
+                            <TextBlock Style="{StaticResource CardTitle}" Margin="0,14,0,0" Text="清理方式" />
+                            <CheckBox Style="{StaticResource RowCheckBox}"
+                                      Content="仅清理正文和附件（保留邮件头）"
+                                      IsChecked="{Binding ClearBodyOnly, Mode=TwoWay}" />
+                            <TextBlock Style="{StaticResource MutedText}"
+                                       Margin="0,4,0,0"
+                                       FontSize="11.5"
+                                       TextWrapping="Wrap"
+                                       Text="勾选后不删除邮件本身：只清空已下载正文、删除附件文件，邮件头与列表保留，阅读时重新下载。该模式不进入隔离区，不可撤销。" />
+
                             <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                                 <Button Style="{StaticResource Btn}"
                                         Content="预览匹配"
@@ -248,7 +259,7 @@
                                         IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
                                 <Button Style="{StaticResource BtnPrimary}"
                                         Margin="8,0,0,0"
-                                        Content="一键清理"
+                                        Content="{Binding CleanupByFilterText}"
                                         Command="{Binding CleanupByFilterCommand}"
                                         IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
                             </StackPanel>
@@ -298,6 +309,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <Border Grid.Row="0"
@@ -347,9 +359,10 @@
                                                    Text="{Binding SelectedRows, StringFormat=已勾选 {0} 封}" />
                                         <Button Style="{StaticResource Btn}"
                                                 Margin="10,0,0,0"
-                                                Content="勾选清理"
+                                                Content="{Binding CleanupSelectedText}"
                                                 Command="{Binding CleanupSelectedCommand}"
-                                                IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
+                                                IsEnabled="{Binding CanCleanupSelected}"
+                                                ToolTip="清理列表中勾选的邮件（勾选可以跨页）" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -365,6 +378,71 @@
                                            Text="点击「预览匹配」按条件筛选邮件"
                                            Visibility="{Binding HasPreview, Converter={StaticResource InverseBoolToVisibility}}" />
                             </Grid>
+
+                            <!-- 底部：勾选（本页 / 全部）与分页 -->
+                            <Border Grid.Row="2"
+                                    BorderBrush="{DynamicResource RuleBrush}"
+                                    BorderThickness="0,1,0,0"
+                                    Padding="10,6">
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="64"
+                                                Content="全选本页"
+                                                Command="{Binding SelectPageCommand}"
+                                                IsEnabled="{Binding CanSelect}" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="64"
+                                                Margin="4,0,0,0"
+                                                Content="反选本页"
+                                                Command="{Binding InvertPageCommand}"
+                                                IsEnabled="{Binding CanSelect}" />
+                                        <Rectangle Style="{StaticResource VDivider}" Margin="8,0" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="52"
+                                                Content="全选"
+                                                ToolTip="勾选当前筛选条件下匹配的全部邮件（跨页）"
+                                                Command="{Binding SelectAllCommand}"
+                                                IsEnabled="{Binding CanSelect}" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="52"
+                                                Margin="4,0,0,0"
+                                                Content="反选"
+                                                ToolTip="勾选与不勾选互换，范围为当前筛选条件下的全部邮件（跨页）"
+                                                Command="{Binding InvertAllCommand}"
+                                                IsEnabled="{Binding CanSelect}" />
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="52"
+                                                Content="首页"
+                                                Command="{Binding FirstPageCommand}"
+                                                IsEnabled="{Binding CanGoPrevious}" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="52"
+                                                Margin="4,0,0,0"
+                                                Content="上一页"
+                                                Command="{Binding PreviousPageCommand}"
+                                                IsEnabled="{Binding CanGoPrevious}" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="10,0"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding PageInfo}" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="52"
+                                                Content="下一页"
+                                                Command="{Binding NextPageCommand}"
+                                                IsEnabled="{Binding CanGoNext}" />
+                                        <Button Style="{StaticResource BtnGhost}"
+                                                MinWidth="52"
+                                                Margin="4,0,0,0"
+                                                Content="末页"
+                                                Command="{Binding LastPageCommand}"
+                                                IsEnabled="{Binding CanGoNext}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </Border>
 

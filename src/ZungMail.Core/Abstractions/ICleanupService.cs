@@ -9,8 +9,21 @@ namespace ZungMail.Core.Abstractions;
 /// </summary>
 public interface ICleanupService
 {
-    /// <summary>按条件预览可清理邮件（最多返回 take 条）与总量统计。</summary>
-    Task<CleanupPreview> PreviewAsync(CleanupFilter filter, int take = 200, CancellationToken ct = default);
+    /// <summary>
+    /// 按条件预览可清理邮件（分页：跳过 <paramref name="skip"/> 条后取 <paramref name="take"/> 条），
+    /// 同时返回总量与预计可释放字节统计。
+    /// </summary>
+    Task<CleanupPreview> PreviewAsync(
+        CleanupFilter filter, int take = 200, int skip = 0, CancellationToken ct = default);
+
+    /// <summary>
+    /// 只取一页预览行（不重算 COUNT/SUM）。汇总由调用方按筛选条件缓存，翻页时用它避免重复全表聚合。
+    /// </summary>
+    Task<IReadOnlyList<CleanupPreviewItem>> PreviewItemsAsync(
+        CleanupFilter filter, int take = 50, int skip = 0, CancellationToken ct = default);
+
+    /// <summary>按条件取出全部匹配邮件的 id（供「全选 / 反选」使用，只取 id 不取正文）。</summary>
+    Task<IReadOnlyList<long>> GetMatchingIdsAsync(CleanupFilter filter, CancellationToken ct = default);
 
     /// <summary>
     /// 执行清理。<paramref name="selectedIds"/> 非空时按手动勾选的 id 清理，否则按筛选条件全量清理。

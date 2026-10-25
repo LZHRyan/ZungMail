@@ -136,7 +136,8 @@ public sealed class DataDirectoryService : IDataDirectoryService
         }
 
         var willBackup = false;
-        if (Directory.Exists(target) && ContainsAnyEntry(target))
+        var willCleanLeftovers = false;
+        if (Directory.Exists(target) && HasMeaningfulEntry(target))
         {
             if (!LooksLikeDataDirectory(target))
             {
@@ -147,10 +148,17 @@ public sealed class DataDirectoryService : IDataDirectoryService
 
             willBackup = true;
         }
+        else if (Directory.Exists(target) && ContainsAnyEntry(target))
+        {
+            // 只剩上次失败留下的日志 / 头像缓存 / WebView2 目录：清掉即可，不当成「已有数据」
+            willCleanLeftovers = true;
+        }
 
         var message = willBackup
             ? "目标目录里已有一份 ZungMail 数据，迁移前会自动改名备份保留。"
-            : "目标目录可用。";
+            : willCleanLeftovers
+                ? "目标目录可用：迁移前会先清掉上次留下的日志与缓存。"
+                : "目标目录可用。";
 
         return new DataDirectoryValidation(true, message, sourceBytes, required, freeBytes, willBackup);
     }
@@ -213,7 +221,7 @@ public sealed class DataDirectoryService : IDataDirectoryService
 
         try
         {
-            if (Directory.Exists(target) && ContainsAnyEntry(target))
+            if (Directory.Exists(target) && HasMeaningfulEntry(target))
             {
                 backupPath = target + "_backup_" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
                 progress?.Report(new DataMigrationProgress("预检", 6, "备份目标目录里的原有数据…"));
@@ -222,10 +230,14 @@ public sealed class DataDirectoryService : IDataDirectoryService
             }
 
             Directory.CreateDirectory(target);
+            CleanupLeftovers(target);
 
             // 1) 整理源库：把 WAL 落盘，这样复制 mail.db 单文件就是一致的
             progress?.Report(new DataMigrationProgress("整理数据库", 10, "把未落盘的日志写回数据库…"));
             var counts = await CheckpointAndCountAsync(source, ct).ConfigureAwait(false);
+
+            // 连接池会保持源库文件句柄：复制前清池，确保 mail.db / -wal / -shm 都能被独占读取
+            SqliteConnection.ClearAllPools();
 
             // 2) 复制文件
             copyStarted = true;
@@ -594,6 +606,58 @@ public sealed class DataDirectoryService : IDataDirectoryService
         catch (Exception)
         {
             return true;
+        }
+    }
+
+    /// <summary>
+    /// 程序自己生成的、迁移时可以直接丢掉的目录名：日志、头像缓存、WebView2 用户数据。
+    /// 上一次迁移尝试失败后客户端会把它们写进目标目录，不能因此认定「目标不是空目录」。
+    /// </summary>
+    private static readonly string[] IgnorableEntries = { "logs", "avatars", "WebView2Preview", ".zungmail-write-test" };
+
+    private static bool IsIgnorableEntry(string name)
+        => IgnorableEntries.Any(entry => string.Equals(entry, name, StringComparison.OrdinalIgnoreCase))
+           || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>除程序自建产物外，目标目录里还有没有别的东西（有才需要备份或拒绝）。</summary>
+    private static bool HasMeaningfulEntry(string directory)
+    {
+        try
+        {
+            return Directory.EnumerateFileSystemEntries(directory)
+                .Any(path => !IsIgnorableEntry(Path.GetFileName(path)));
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>迁移前清掉目标目录里的遗留日志 / 缓存，避免和源目录的同名目录混在一起。</summary>
+    private void CleanupLeftovers(string target)
+    {
+        try
+        {
+            foreach (var path in Directory.EnumerateFileSystemEntries(target))
+            {
+                var name = Path.GetFileName(path);
+                if (!IsIgnorableEntry(name)) continue;
+
+                try
+                {
+                    if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+                    else File.Delete(path);
+                    _logger.LogInformation("迁移前清掉目标目录里的遗留物：{Path}", path);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "清掉目标目录遗留物失败：{Path}", path);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "扫描目标目录遗留物失败：{Target}", target);
         }
     }
 

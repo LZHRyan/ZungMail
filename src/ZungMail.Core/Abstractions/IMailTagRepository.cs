@@ -25,6 +25,15 @@ public interface IMailTagRepository
 
     Task RemoveFromMessageAsync(long emailId, long tagId, CancellationToken ct = default);
 
+    /// <summary>
+    /// 一次事务给多封邮件打同一个标签：单连接 + 单事务，避免逐封建连。
+    /// 已存在的关联静默跳过（幂等）。
+    /// </summary>
+    Task AddToMessagesAsync(long tagId, IReadOnlyList<long> emailIds, CancellationToken ct = default);
+
+    /// <summary>一次事务移除多封邮件的同一标签：单连接 + 单事务。</summary>
+    Task RemoveFromMessagesAsync(long tagId, IReadOnlyList<long> emailIds, CancellationToken ct = default);
+
     /// <summary>按标签查询邮件 id（分页由调用方的 MessageQuery 负责排序）。</summary>
     Task<IReadOnlyList<long>> GetMessageIdsAsync(long tagId, CancellationToken ct = default);
 }

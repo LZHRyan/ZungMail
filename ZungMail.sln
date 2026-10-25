@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -25,6 +25,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.UpdateServer", "src\ZungMail.UpdateServer\ZungMail.UpdateServer.csproj", "{B3D57648-1AC8-41A6-9A48-C114FC8F0E48}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.UpdateServer.Tests", "tests\ZungMail.UpdateServer.Tests\ZungMail.UpdateServer.Tests.csproj", "{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZungMail.Summary.LocalModel", "src\ZungMail.Summary.LocalModel\ZungMail.Summary.LocalModel.csproj", "{18B4C802-10DC-4BD3-B27D-3FD727BFB7EE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -72,6 +74,10 @@ Global
 		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18B4C802-10DC-4BD3-B27D-3FD727BFB7EE}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{18B4C802-10DC-4BD3-B27D-3FD727BFB7EE}.Debug|Any CPU.Build.0 = Debug|x64
+		{18B4C802-10DC-4BD3-B27D-3FD727BFB7EE}.Release|Any CPU.ActiveCfg = Release|x64
+		{18B4C802-10DC-4BD3-B27D-3FD727BFB7EE}.Release|Any CPU.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -81,5 +87,6 @@ Global
 		{D564E6E3-9247-4B80-9FD5-364473409CE3} = {D63FA135-C547-4328-B940-6FF9A8A5D21C}
 		{B3D57648-1AC8-41A6-9A48-C114FC8F0E48} = {D63FA135-C547-4328-B940-6FF9A8A5D21C}
 		{28E6F11C-6F8A-4900-9183-EDEB9F9AE445} = {25F34D91-03DC-439F-8C5B-CD1537465149}
+		{18B4C802-10DC-4BD3-B27D-3FD727BFB7EE} = {D63FA135-C547-4328-B940-6FF9A8A5D21C}
 	EndGlobalSection
 EndGlobal

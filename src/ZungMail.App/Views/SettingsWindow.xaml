@@ -545,6 +545,10 @@
                                           ToolTip="收信时判定：通讯录里没有、也从来没有来过信的发件人，在列表与阅读区打警告色「陌生」标记。关闭后不再显示，判定数据仍保留在本地库。"
                                           IsChecked="{Binding Settings.MarkStrangerSenders}" />
                                 <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="标记退信邮件（投递失败退回时用红框提示）"
+                                          ToolTip="收信时按 MIME 结构（delivery-status 报告）与「退信类发件人 + 退信主题」认定；正文下载后再补失败收件人与 SMTP 状态码。关闭后不再显示，判定数据仍保留在本地库。"
+                                          IsChecked="{Binding Settings.MarkBounceMails}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
                                           Content="检测仿冒域名（钓鱼警示）"
                                           ToolTip="发件人域名与你自己账户的企业域名高度相似时（差一个字符、0/1 混淆、换后缀、夹在你的域名里），在列表与阅读区打红色「疑似钓鱼」警示。公共邮箱域名（qq / 163 / gmail 等）不参与比较。"
                                           IsChecked="{Binding Settings.PhishingDomainWarning}" />
@@ -736,6 +740,153 @@
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
+
+                <!-- ============ 本地 AI 助手 ============ -->
+                <ScrollViewer Grid.Column="1"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsAiSection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Margin="20,18,20,20">
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="本地 AI 助手" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="阅读区的「AI 总结」由工具栏按钮触发：点一下才生成卡片，不占版面。启用本地 AI 后用小模型在本机推理，把正文压成 要点 / 待处理 / 单号 三段，正文不出本机、不联网（只有下载模型时联网）；关闭时改用规则抽取，不加载模型、不占内存。" />
+
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="启用本地 AI（本机小模型摘要）"
+                                          ToolTip="默认关闭：不加载模型、不下载、不占内存。关闭时「AI 总结」仍可用，走规则抽取；模型没就绪或推理失败也会自动退回规则抽取。"
+                                          IsChecked="{Binding Settings.LocalAiEnabled}" />
+
+                                <StackPanel Orientation="Horizontal" Margin="24,8,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="76"
+                                               VerticalAlignment="Center"
+                                               Text="摘要引擎" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="280"
+                                              ToolTip="「自动」= 本地模型可用就用本地模型，否则退回规则抽取；关闭「启用本地 AI」时无论选哪个都只走规则抽取。引擎可插拔，以后接云端接口不用改这里。"
+                                              ItemsSource="{Binding MailSummaryProviderOptions}"
+                                              SelectedIndex="{Binding MailSummaryProviderIndex, Mode=TwoWay}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="16,0,0,0"
+                                               Width="60"
+                                               VerticalAlignment="Center"
+                                               Text="摘要长度" />
+                                    <ComboBox Style="{StaticResource AppComboBox}"
+                                              Width="150"
+                                              ToolTip="越长越完整，推理也越慢"
+                                              ItemsSource="{Binding MailSummaryLengthOptions}"
+                                              SelectedIndex="{Binding MailSummaryLengthIndex, Mode=TwoWay}" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="24,10,0,0">
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Width="76"
+                                               VerticalAlignment="Center"
+                                               Text="覆盖上限" />
+                                    <TextBox Style="{StaticResource AppTextBox}"
+                                             Width="80"
+                                             ToolTip="一次总结最多覆盖多少字（2000–24000）。超过 4000 字会按段落自动分段逐段总结再合并；再超出总上限的尾部不总结，卡片上会说明。"
+                                             Text="{Binding Settings.MailSummaryInputChars, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="字（2000–24000，按段总结）" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="摘要模型" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="推荐 Qwen2.5-0.5B-Instruct（GGUF Q4，约 400 MB）。按需下载到本机，不打进安装包；也可以把自己的 GGUF 文件放进模型目录后点「重新检测」。未启用本地 AI 时不会加载模型，文件可保留、不随更新删除。" />
+
+                                <Border Margin="0,10,0,0"
+                                        Padding="12,10"
+                                        CornerRadius="8"
+                                        Background="{DynamicResource AppBackgroundBrush}"
+                                        BorderBrush="{DynamicResource RuleBrush}"
+                                        BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding MailSummaryModelStatusText}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource InkBrush}" />
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="0,4,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding MailSummaryModelDetail}" />
+
+                                        <ProgressBar Height="4"
+                                                     Margin="0,8,0,0"
+                                                     Maximum="100"
+                                                     Value="{Binding MailSummaryModelPercent}"
+                                                     Foreground="{DynamicResource AccentBrush}"
+                                                     Background="{DynamicResource RuleBrush}"
+                                                     BorderThickness="0"
+                                                     Visibility="{Binding IsMailSummaryModelBusy, Converter={StaticResource BoolToVisibility}}" />
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                            <Button Style="{StaticResource BtnPrimary}"
+                                                    Content="下载模型"
+                                                    Command="{Binding DownloadMailSummaryModelCommand}"
+                                                    IsEnabled="{Binding IsMailSummaryModelBusy, Converter={StaticResource InverseBool}}"
+                                                    ToolTip="下载到本机数据目录；可用下面的地址换成自己的镜像" />
+                                            <Button Style="{StaticResource Btn}"
+                                                    Margin="8,0,0,0"
+                                                    Content="重新检测"
+                                                    Command="{Binding RecheckMailSummaryModelCommand}" />
+                                            <Button Style="{StaticResource Btn}"
+                                                    Margin="8,0,0,0"
+                                                    Content="打开目录"
+                                                    Command="{Binding OpenMailSummaryModelFolderCommand}" />
+                                            <Button Style="{StaticResource Btn}"
+                                                    Margin="8,0,0,0"
+                                                    Content="删除模型"
+                                                    Command="{Binding DeleteMailSummaryModelCommand}" />
+                                        </StackPanel>
+
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="0,12,0,4"
+                                                   Text="模型下载地址（留空用内置默认；也可换成自己的镜像）" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Text="{Binding Settings.MailSummaryModelUrl, UpdateSourceTrigger=PropertyChanged}" />
+
+                                        <TextBlock Style="{StaticResource MutedText}"
+                                                   Margin="0,10,0,4"
+                                                   Text="模型 SHA256（留空用内置默认，或与地址一起换成自己的）" />
+                                        <TextBox Style="{StaticResource AppTextBox}"
+                                                 Text="{Binding Settings.MailSummaryModelSha256, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="隐私与资源占用" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="摘要只在本机生成，除下载模型外不发起任何网络请求；日志与反馈包里不记录正文，只保留耗时与字符数。推理时内存约 0.6 GB，空闲 5 分钟自动释放。" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding MailSummaryModelDirectory, StringFormat=模型目录：{0}}" />
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,4,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="模型文件是可丢弃的缓存：删掉后下次总结会提示重新下载，邮件与设置都不受影响。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
 
                 <!-- ============ 账户 ============ -->
                 <Grid Grid.Column="1"
@@ -2647,6 +2798,81 @@
                                                TextWrapping="Wrap"
                                                Text="{Binding DataDirectory}" />
                                 </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 运行环境：装机前要核对的硬性最低要求（与安装包、README 一致），末尾一行是本机实测 -->
+                        <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardTitle}" Text="运行环境（最低要求）" />
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="操作系统" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="Windows 10（1607 及以上）或 Windows 11，仅支持 64 位" />
+
+                                    <TextBlock Grid.Row="1" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="处理器" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="x64 双核 1.6 GHz 及以上" />
+
+                                    <TextBlock Grid.Row="2" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="内存" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="4 GB 及以上；邮件量大（数万封）建议 8 GB" />
+
+                                    <TextBlock Grid.Row="3" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="硬盘空间" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="程序约 190 MB；数据目录随邮件量增长，约 1 GB / 万封（含正文缓存与附件副本）" />
+
+                                    <TextBlock Grid.Row="4" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="显示" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="最低 1280 × 800，推荐 1920 × 1080；支持 100%–200% 缩放" />
+
+                                    <TextBlock Grid.Row="5" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="运行库" />
+                                    <TextBlock Grid.Row="5" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="安装包自带 .NET 8 运行时，无需另装；框架依赖版需预装 .NET 8 桌面运行时" />
+
+                                    <TextBlock Grid.Row="6" Style="{StaticResource MutedText}" Margin="0,0,0,8" Text="浏览器内核" />
+                                    <TextBlock Grid.Row="6" Grid.Column="1" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="Microsoft Edge WebView2 运行时（Windows 11 自带；缺失时邮件正文退化为纯文本，其余功能不受影响）" />
+
+                                    <TextBlock Grid.Row="7" Style="{StaticResource MutedText}" Text="网络" />
+                                    <TextBlock Grid.Row="7" Grid.Column="1"
+                                               Foreground="{DynamicResource InkBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="能访问邮件服务商的 IMAP 993 / SMTP 465（SSL）；检查更新走 443" />
+                                </Grid>
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,10,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding LocalEnvironmentText}" />
                             </StackPanel>
                         </Border>
 

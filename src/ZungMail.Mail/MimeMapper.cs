@@ -72,6 +72,8 @@ internal static class MimeMapper
 
         detail.References = ExtractMessageIds(summary.References);
         detail.MdnTo = (summary.MdnTo ?? string.Empty).Trim();
+        // 退信结论在入库前定下来：结构信号（DSN）优先，结构缺失时看「发件人 + 主题」双条件
+        detail.IsBounce = BounceMailPolicy.IsBounce(detail.FromEmail, detail.FromName, detail.Subject, summary.IsDsnReport);
         detail.ThreadId = ThreadKeyBuilder.Build(detail.MessageId, detail.References, detail.Subject);
         return detail;
     }

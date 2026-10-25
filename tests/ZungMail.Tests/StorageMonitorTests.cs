@@ -108,29 +108,44 @@ VALUES(@messageId, '附件.pdf', 'application/pdf', @size, 0, @path);
     }
 
     [Fact]
-    public async Task 分级阈值_按默认75_85_95判定()
+    public void 分级阈值_按默认75_85_95判定()
     {
-        AddMessage(TrashFolder, 1024);
-
-        Assert.Equal(StorageAlertLevel.Normal, await SetUsageAsync(60));
-        Assert.Equal(StorageAlertLevel.Notice, await SetUsageAsync(80));
-        Assert.Equal(StorageAlertLevel.Warning, await SetUsageAsync(90));
-        Assert.Equal(StorageAlertLevel.Critical, await SetUsageAsync(97));
+        // 纯策略判定：不读真实磁盘，避免 SQLite 页分配让占用率在两次快照之间漂移
+        Assert.Equal(StorageAlertLevel.Normal, Level(60));
+        Assert.Equal(StorageAlertLevel.Normal, Level(74.9));
+        Assert.Equal(StorageAlertLevel.Notice, Level(75));
+        Assert.Equal(StorageAlertLevel.Notice, Level(80));
+        Assert.Equal(StorageAlertLevel.Warning, Level(90));
+        Assert.Equal(StorageAlertLevel.Critical, Level(97));
     }
 
     [Fact]
-    public async Task 分级阈值_支持自定义百分比()
+    public void 分级阈值_支持自定义百分比()
     {
-        AddMessage(TrashFolder, 1024);
         _settings.Current.StorageNoticePercent = 50;
         _settings.Current.StorageWarningPercent = 60;
         _settings.Current.StorageCriticalPercent = 70;
 
-        Assert.Equal(StorageAlertLevel.Notice, await SetUsageAsync(55));
-        Assert.Equal(StorageAlertLevel.Warning, await SetUsageAsync(65));
-        Assert.Equal(StorageAlertLevel.Critical, await SetUsageAsync(75));
+        Assert.Equal(StorageAlertLevel.Notice, Level(55));
+        Assert.Equal(StorageAlertLevel.Warning, Level(65));
+        Assert.Equal(StorageAlertLevel.Critical, Level(75));
     }
 
+    [Fact]
+    public async Task 快照的占用率与级别一致()
+    {
+        AddMessage(TrashFolder, 1024);
+        await SetUsageAsync(60);
+
+        var snapshot = await _monitor.GetSnapshotAsync();
+
+        Assert.True(snapshot.UsagePercent > 0);
+        // 集成层只验接线：快照里的级别必须等于同一占用率过策略函数的结果，不卡边界
+        Assert.Equal(StorageMonitor.Evaluate(_settings.Current, snapshot.UsagePercent, out _), snapshot.Level);
+    }
+
+    private StorageAlertLevel Level(double usage)
+        => StorageMonitor.Evaluate(_settings.Current, usage, out _);
     [Fact]
     public async Task 关闭预警开关后始终为正常()
     {

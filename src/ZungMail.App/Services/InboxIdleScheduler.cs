@@ -50,6 +50,9 @@ public sealed class InboxIdleScheduler : BackgroundService
     {
         StartupTrace.Mark("定时器 InboxIdle 进入");
 
+        // 首轮里的 DB 调用是「假异步」（同步完成），会占住调用 Host.StartAsync 的线程；先让出调度器
+        await Task.Yield();
+
         using var timer = new PeriodicTimer(ReconcileInterval);
 
         try

@@ -154,6 +154,12 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAppPaths>(),
             sp.GetRequiredService<ILogger<GravatarAvatarService>>()));
 
+        // 摘要模型仓库：按需下载到 %LOCALAPPDATA%\ZungMail\models（模型不进安装包）
+        services.AddSingleton<ISummaryModelStore>(sp => new SummaryModelStore(
+            sp.GetRequiredService<ISettingsStore>(),
+            baseDirectory: null,
+            sp.GetService<ILogger<SummaryModelStore>>()));
+
         // 存储空间监控与历史清理（需求 2、3）
         services.AddSingleton<IStorageMonitor, StorageMonitor>();
         services.AddSingleton<ICleanupService>(sp =>

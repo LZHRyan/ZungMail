@@ -38,6 +38,38 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task 邮件摘要设置_默认值与往返()
+    {
+        var store = CreateStore();
+        await store.LoadAsync();
+
+        // 默认：不启用本地 AI（不加载模型）、自动选引擎、标准长度、12000 字覆盖上限、无自定义模型地址
+        Assert.False(store.Current.LocalAiEnabled);
+        Assert.Equal(MailSummarySettings.AutoProviderId, store.Current.MailSummaryProvider);
+        Assert.Equal(12000, store.Current.MailSummaryInputChars);
+        Assert.Equal("", store.Current.MailSummaryModelUrl);
+        Assert.Equal(MailSummaryLength.Normal, MailSummarySettings.ResolveLength(store.Current.MailSummaryLength));
+
+        store.Current.LocalAiEnabled = true;
+        store.Current.MailSummaryProvider = MailSummarySettings.RuleBasedProviderId;
+        store.Current.MailSummaryLength = "detailed";
+        store.Current.MailSummaryInputChars = 9000;
+        store.Current.MailSummaryModelUrl = "https://example.com/model.gguf";
+        store.Current.MailSummaryModelSha256 = "ABC";
+        await store.SaveAsync();
+
+        var reopened = CreateStore();
+        await reopened.LoadAsync();
+
+        Assert.True(reopened.Current.LocalAiEnabled);
+        Assert.Equal(MailSummarySettings.RuleBasedProviderId, reopened.Current.MailSummaryProvider);
+        Assert.Equal(MailSummaryLength.Detailed, MailSummarySettings.ResolveLength(reopened.Current.MailSummaryLength));
+        Assert.Equal(9000, reopened.Current.MailSummaryInputChars);
+        Assert.Equal("https://example.com/model.gguf", reopened.Current.MailSummaryModelUrl);
+        Assert.Equal("abc", MailSummarySettings.ResolveModelSha256(reopened.Current.MailSummaryModelSha256));
+    }
+
+    [Fact]
     public async Task LoadAsync_文件损坏_改名备份并使用默认值()
     {
         var store = CreateStore();

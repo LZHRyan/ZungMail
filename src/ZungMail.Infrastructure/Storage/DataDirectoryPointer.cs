@@ -428,6 +428,23 @@ public sealed class DataDirectoryPointer
         File.Move(temp, PointerPath, overwrite: true);
     }
 
+    /// <summary>
+    /// 当前实际应该用来读写文件的目录。
+    /// <para>
+    /// 有待迁移（<see cref="DataDirectoryState.PendingSource"/>）时仍用源目录：指针里的 DataDirectory
+    /// 已经是目标目录，如果启动时直接按它建目录，日志/临时文件会先落进目标目录，
+    /// 下一次预检就会因为「目标目录不是空的」把迁移挡在门外。
+    /// 源目录不存在（被手工删掉）时才退回目标目录，迁移流程会把指针切成目标目录。
+    /// </para>
+    /// </summary>
+    public static string ResolveEffective(DataDirectoryState state)
+    {
+        var pending = Normalize(state.PendingSource);
+        if (pending is not null && Directory.Exists(pending)) return pending;
+
+        return state.DataDirectory;
+    }
+
     /// <summary>规范化并校验绝对路径；非法时返回 null。</summary>
     public static string? Normalize(string? path)
     {

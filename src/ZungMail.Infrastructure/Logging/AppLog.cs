@@ -18,6 +18,8 @@ public static class AppLog
 
     public static void Info(string message) => Logger.Value.LogInformation("{Message}", message);
 
+    public static void Warn(string message) => Logger.Value.LogWarning("{Message}", message);
+
     public static void Error(string message, Exception? exception = null)
         => Logger.Value.LogError(exception, "{Message}", message);
 }

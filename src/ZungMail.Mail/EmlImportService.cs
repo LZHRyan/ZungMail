@@ -166,9 +166,25 @@ public sealed class EmlImportService : IMailImportService
             .Select(reference => NormalizeMessageId(reference))
             .Where(reference => reference.Length > 0)
             .ToList();
+
+        // 导入的历史 eml 也一样判定退信：结构（multipart/report）+ 发件人 + 主题，
+        // 细节在下面正文落盘前顺带解析（与同步链路同一套策略）。
+        detail.IsBounce = BounceMailPolicy.IsBounce(detail.FromEmail, detail.FromName, detail.Subject, IsDsnReport(message));
+        if (detail.IsBounce && BounceDsnParser.Parse(message) is { } bounce)
+        {
+            detail.BounceRecipient = bounce.Recipient;
+            detail.BounceStatus = bounce.Status;
+            detail.BounceDetail = bounce.Detail;
+        }
+
         detail.ThreadId = ThreadKeyBuilder.Build(detail.MessageId, detail.References, detail.Subject);
         return detail;
     }
+
+    /// <summary>顶层结构是否 DSN 报告（multipart/report 且带 delivery-status 段；MDN 阅读收条不算）。</summary>
+    private static bool IsDsnReport(MimeMessage message) =>
+        message.Body is MultipartReport report
+        && string.Equals(report.ReportType, "delivery-status", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeMessageId(string? value)
     {

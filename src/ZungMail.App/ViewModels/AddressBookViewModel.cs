@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ZungMail.App.Services;
@@ -70,9 +72,37 @@ public sealed partial class AddressBookViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value)
     {
-        // 换了搜索词就从第一页重新看
+        // 换了搜索词就从第一页重新看：150ms 防抖，避免逐键查库
         CurrentPage = 1;
-        _ = ReloadAsync();
+        QueueSearchReload();
+    }
+
+    /// <summary>搜索防抖：连打一串字符只在停顿后查一次，并丢弃过期结果。</summary>
+    private const int SearchDebounceMs = 150;
+
+    private CancellationTokenSource? _searchDebounce;
+    private int _reloadVersion;
+
+    private void QueueSearchReload()
+    {
+        _searchDebounce?.Cancel();
+        _searchDebounce?.Dispose();
+        var cts = new CancellationTokenSource();
+        _searchDebounce = cts;
+
+        FireAndForget.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(SearchDebounceMs, cts.Token).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            await ReloadAsync().ConfigureAwait(true);
+        }, "通讯录搜索");
     }
 
     partial void OnCurrentPageChanged(int value) => RaisePagerChanged();
@@ -254,16 +284,24 @@ public sealed partial class AddressBookViewModel : ObservableObject
 
     private async Task ReloadAsync()
     {
+        var version = ++_reloadVersion;
         try
         {
             var filter = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText.Trim();
-            var page = await _contacts.QueryAsync(filter, (CurrentPage - 1) * PageSize, PageSize);
+
+            // SQLite 的「异步」底层同步执行：查询放线程池，界面线程只做集合与属性赋值
+            var page = await Task.Run(() => _contacts.QueryAsync(filter, (CurrentPage - 1) * PageSize, PageSize))
+                .ConfigureAwait(true);
+            if (version != _reloadVersion) return;   // 已有更新的搜索/翻页，丢弃本次结果
 
             // 删除 / 搜索后当前页可能超出范围：退回最后一页再查一次
             if (page.Items.Count == 0 && CurrentPage > 1 && page.TotalCount > 0)
             {
                 CurrentPage = Math.Max(1, (int)Math.Ceiling(page.TotalCount / (double)PageSize));
-                page = await _contacts.QueryAsync(filter, (CurrentPage - 1) * PageSize, PageSize);
+                var lastPage = CurrentPage;
+                page = await Task.Run(() => _contacts.QueryAsync(filter, (lastPage - 1) * PageSize, PageSize))
+                    .ConfigureAwait(true);
+                if (version != _reloadVersion) return;
             }
 
             TotalCount = page.TotalCount;

@@ -17,8 +17,9 @@ public sealed class SqliteConnectionFactory
         {
             DataSource = paths.DatabasePath,
             Cache = SqliteCacheMode.Shared,
-            // 关闭连接池：Dispose 即释放文件句柄，避免导出/备份时 db 文件被占用（导出需复制 -wal/-shm）。
-            Pooling = false
+            // 开连接池：仓储方法多、每个 1~3ms 的 open + 4 条 PRAGMA 会累加（首屏约 15~20 次调用）。
+            // 导出 / 备份 / 数据目录迁移前由调用方 SqliteConnection.ClearAllPools() 释放文件句柄。
+            Pooling = true
         }.ToString();
     }
 

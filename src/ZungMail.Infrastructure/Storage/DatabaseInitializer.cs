@@ -12,7 +12,7 @@ namespace ZungMail.Infrastructure.Storage;
 public sealed class DatabaseInitializer
 {
     /// <summary>当前架构版本；每次结构变更递增，并在 <see cref="Migrations"/> 注册对应步骤。</summary>
-    public const int SchemaVersion = 22;
+    public const int SchemaVersion = 24;
 
     /// <summary>一次性修复：早期版本未落盘 multipart/related 内嵌图片，正文残留 cid: 引用。</summary>
     private const string InlineImageRepairKey = "repair.inline-images.v1";
@@ -22,6 +22,9 @@ public sealed class DatabaseInitializer
 
     /// <summary>一次性回填：v17 起新增行业邮件类型与案件阶段，需要再重抽一遍。</summary>
     private const string MailTypeBackfillKey = "backfill.mail-types.v2";
+
+    /// <summary>一次性回填：v23 起新增退信标识，历史退信也要标出来（不等下一次同一个人再退）。</summary>
+    private const string BounceBackfillKey = "backfill.bounce-marks.v1";
 
     /// <summary>
     /// 有序迁移表：版本号必须连续递增。每个迁移在独立事务中执行，成功后连同版本号一起提交；
@@ -263,8 +266,110 @@ WHERE id = COALESCE(
             command.CommandText =
                 "CREATE INDEX IF NOT EXISTS ix_messages_from_email ON messages(from_email COLLATE NOCASE);";
             command.ExecuteNonQuery();
+        }),
+
+        // 版本 23：退信标识。存量邮件先加列，再用与收信同一份 BounceMailPolicy 回填一遍——
+        // 升级前收到的退信同样需要标出来（否则要等下次同一个人再退一次才生效）。
+        // 细节三列由正文下载后的 delivery-status 解析回填，未解析时保持空串。
+        (23, "BounceMark", static (connection, tx) =>
+        {
+            EnsureColumn(connection, tx, "messages", "is_bounce", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(connection, tx, "messages", "bounce_recipient", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, tx, "messages", "bounce_status", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, tx, "messages", "bounce_detail", "TEXT NOT NULL DEFAULT ''");
+        }),
+
+        // 版本 24：会话归并键。会话列表原来按 COALESCE(NULLIF(thread_id,''),'local:'||id) 分组，
+        // 表达式不 sargable、每页还要按组回查一次全表；改成虚拟生成列 + 索引，查询与分组都能走索引。
+        (24, "ThreadKeyIndex", static (connection, tx) =>
+        {
+            using (var check = connection.CreateCommand())
+            {
+                check.Transaction = tx;
+                // 生成列在 pragma_table_info 里是隐藏列，必须用 table_xinfo 才能看到
+                check.CommandText = "SELECT COUNT(*) FROM pragma_table_xinfo('messages') WHERE name = 'thread_key';";
+                if (Convert.ToInt64(check.ExecuteScalar() ?? 0L) == 0)
+                {
+                    using var alter = connection.CreateCommand();
+                    alter.Transaction = tx;
+                    alter.CommandText =
+                        "ALTER TABLE messages ADD COLUMN thread_key TEXT " +
+                        "GENERATED ALWAYS AS (COALESCE(NULLIF(thread_id, ''), 'local:' || id)) VIRTUAL;";
+                    alter.ExecuteNonQuery();
+                }
+            }
+
+            using var index = connection.CreateCommand();
+            index.Transaction = tx;
+            index.CommandText = "CREATE INDEX IF NOT EXISTS ix_messages_thread_key ON messages(thread_key);";
+            index.ExecuteNonQuery();
         })
     };
+
+    /// <summary>
+    /// 一次性回填（meta 里打标记，只跑一次）：与收信时同一套 <see cref="BounceMailPolicy"/>。
+    /// 这里只有发件人与主题可用，所以只走「退信类发件人 + 退信主题」双条件；
+    /// 延迟通知（delay / 延迟）在策略里已被排除，不会误标。
+    /// </summary>
+    private static void BackfillBounceMarksOnce(SqliteConnection connection)
+    {
+        using (var check = connection.CreateCommand())
+        {
+            check.CommandText = "SELECT COUNT(*) FROM meta WHERE key = @key;";
+            check.Parameters.AddWithValue("@key", BounceBackfillKey);
+            if (Convert.ToInt64(check.ExecuteScalar() ?? 0L) > 0) return;
+        }
+
+        using var tx = connection.BeginTransaction();
+        BackfillBounceMarks(connection, tx);
+
+        using (var stamp = connection.CreateCommand())
+        {
+            stamp.Transaction = tx;
+            stamp.CommandText = "INSERT INTO meta(key, value) VALUES(@key, @value);";
+            stamp.Parameters.AddWithValue("@key", BounceBackfillKey);
+            stamp.Parameters.AddWithValue("@value", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            stamp.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// 按「发件人 + 主题」扫一遍还没有退信标识的邮件并打标，返回标记数量。
+    /// 13k 级邮件的一次性扫描在迁移事务里完成，耗时可接受。
+    /// </summary>
+    private static int BackfillBounceMarks(SqliteConnection connection, SqliteTransaction tx)
+    {
+        var matches = new List<long>();
+
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = tx;
+            read.CommandText = "SELECT id, from_name, from_email, subject FROM messages WHERE is_bounce = 0;";
+            using var reader = read.ExecuteReader();
+            while (reader.Read())
+            {
+                var id = reader.GetInt64(0);
+                var fromName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                var fromEmail = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+                var subject = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
+
+                if (BounceMailPolicy.IsBounce(fromEmail, fromName, subject)) matches.Add(id);
+            }
+        }
+
+        foreach (var id in matches)
+        {
+            using var update = connection.CreateCommand();
+            update.Transaction = tx;
+            update.CommandText = "UPDATE messages SET is_bounce = 1 WHERE id = @id;";
+            update.Parameters.AddWithValue("@id", id);
+            update.ExecuteNonQuery();
+        }
+
+        return matches.Count;
+    }
 
     private readonly SqliteConnectionFactory _factory;
     private readonly Action<string>? _trace;
@@ -322,6 +427,7 @@ WHERE id = COALESCE(
             ScheduleShipmentBackfill(connection);
             ScheduleMailTypeBackfill(connection);
             RepairLegacyInlineImages(connection);
+            BackfillBounceMarksOnce(connection);
             Mark("一次性修复检查");
 
             _initialized = true;
@@ -672,6 +778,10 @@ CREATE TABLE IF NOT EXISTS messages(
     fts_from       TEXT,
     fts_to         TEXT,
     fts_body       TEXT,
+    -- 会话归并键：thread_id 为空的本机会话用 local:id 兜底；虚拟列不占空间。
+    -- 索引 ix_messages_thread_key 只在迁移 v24 里建：升级路径上 SchemaSql 先于迁移执行，
+    -- 老库此刻还没有这一列，在这里建索引会直接报 no such column。
+    thread_key     TEXT GENERATED ALWAYS AS (COALESCE(NULLIF(thread_id, ''), 'local:' || id)) VIRTUAL,
     UNIQUE(folder_id, uid)
 );
 

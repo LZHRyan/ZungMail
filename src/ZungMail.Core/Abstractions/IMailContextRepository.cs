@@ -9,11 +9,21 @@ public sealed record CorrespondenceItem(
     string FromName,
     DateTimeOffset DateUtc,
     bool IsUnread,
-    long FolderId)
+    long FolderId,
+    string Preview = "",
+    bool HasAttachment = false)
 {
     public string SubjectDisplay => string.IsNullOrWhiteSpace(Subject) ? "（无主题）" : Subject;
 
     public string DateDisplay => DisplayFormat.RelativeDate(DateUtc);
+
+    /// <summary>卡片上的时间：带时分的相对时间，同一天连着几封也能看出先后。</summary>
+    public string DateDetailDisplay => DisplayFormat.RelativeDateTime(DateUtc);
+
+    /// <summary>正文摘要（同步时落库的一行预览）；没有预览时卡片只显示主题。</summary>
+    public string PreviewDisplay => string.IsNullOrWhiteSpace(Preview) ? string.Empty : Preview.Trim();
+
+    public bool HasPreview => PreviewDisplay.Length > 0;
 }
 
 /// <summary>侧边栏“同发件人附件”条目。</summary>

@@ -70,6 +70,8 @@ public sealed class MainViewModelJourneyTests : IDisposable
         services.AddSingleton<UpdateCoordinator>();
         services.AddSingleton<UpdateInstallService>();
         services.AddSingleton<UpdateWindowService>();
+        // 阅读区「AI 总结」子视图模型：与 App.OnStartup 保持一致（测试里不触发推理）
+        services.AddSingleton<MailSummaryViewModel>();
         services.AddSingleton<MainViewModel>();
 
         _provider = services.BuildServiceProvider();
@@ -303,48 +305,5 @@ public sealed class MainViewModelJourneyTests : IDisposable
         Assert.True(condition(), message);
     }
 
-    private sealed class NullDialogService : IDialogService
-    {
-        public bool ShowCompose(ComposeRequest request) => false;
 
-        public bool ShowAccountEditor(Account? account) => false;
-
-        public bool ShowSettings(string? sectionKey = null, long? accountId = null) => false;
-
-        public bool ShowOutbox() => false;
-
-        public bool ShowCleanup(CleanupScope? scope = null) => false;
-
-        public bool ShowAddressBook() => false;
-
-        public FollowUpCreateRequest? ShowFollowUpEditor(EmailDetail detail, string selfEmail) => null;
-
-        public FollowUpActionRequest? ShowFollowUps() => null;
-
-        public bool ShowShipmentCase(long caseId, Action<string>? applySearch = null) => false;
-
-        public bool ShowFolderEditor(FolderEditRequest request) => false;
-
-        public MailFolder? PickMoveTarget(IReadOnlyList<MoveTargetItem> targets, MailFolder? current) => null;
-
-        public bool ShowAttachmentPreview(string fileName, string path) => false;
-
-        public void ShowDiagnosticsReport(DiagnosticsReport report)
-        {
-        }
-
-        public bool Confirm(
-            string title,
-            string message,
-            string primaryText = "确定",
-            string? detail = null,
-            DialogIcon icon = DialogIcon.Question,
-            bool danger = false) => true;
-
-        public DialogChoice Ask(MessageDialogOptions options) => DialogChoice.Cancel;
-
-        public void Alert(string title, string message, DialogIcon icon = DialogIcon.Info, string? detail = null)
-        {
-        }
-    }
 }

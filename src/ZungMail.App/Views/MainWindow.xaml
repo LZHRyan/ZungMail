@@ -482,6 +482,21 @@
                                            FontWeight="Bold"
                                            Foreground="White" />
                             </Border>
+                            <!-- 退信：投递失败退回，红框标出（比「陌生」更紧急，排在它前面） -->
+                            <Border Background="{DynamicResource CriticalSoftBrush}"
+                                    BorderBrush="{DynamicResource CriticalBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="4,0"
+                                    Margin="6,0,0,0"
+                                    VerticalAlignment="Center"
+                                    ToolTip="{Binding BounceHint}"
+                                    Visibility="{Binding BounceBadgeVisible, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="退信"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource CriticalBrush}" />
+                            </Border>
                             <!-- 陌生发件人：首次收到该地址来信，用警告色（琥珀）与「异常邮件」的红色角标区分 -->
                             <Border Background="{DynamicResource WarningSoftBrush}"
                                     BorderBrush="{DynamicResource WarningBrush}"
@@ -790,8 +805,9 @@
             <EventSetter Event="PreviewMouseRightButtonDown" Handler="OnMailItemRightButtonDown" />
         </Style>
 
-        <!-- 往来邮件卡片：右键可打开该封邮件 -->
+        <!-- 往来邮件卡片：右键可打开该封邮件；内边距由模板自己排（左栏留给未读竖标） -->
         <Style x:Key="CorrespondenceCardItem" TargetType="ListBoxItem" BasedOn="{StaticResource SidebarCardItem}">
+            <Setter Property="Padding" Value="0" />
             <Setter Property="ContextMenu">
                 <Setter.Value>
                     <ContextMenu Style="{StaticResource MailContextMenu}"
@@ -924,7 +940,7 @@
 
             <!-- ============ 标题栏（只留品牌与窗口按钮，搜索框已下移到工具栏） ============ -->
             <Border Grid.Row="0"
-                    Height="38"
+                    Height="32"
                     Background="{DynamicResource ChromeBrush}"
                     BorderBrush="{DynamicResource RuleBrush}"
                     BorderThickness="0,0,0,1"
@@ -2367,11 +2383,60 @@
                                              SelectedItem="{Binding SelectedCorrespondence, Mode=TwoWay}">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding SubjectDisplay}" FontSize="12" TextTrimming="CharacterEllipsis"
-                                                               Foreground="{DynamicResource InkBrush}" />
-                                                    <TextBlock Style="{StaticResource MutedText}" FontSize="11" Margin="0,3,0,0" Text="{Binding DateDisplay}" />
-                                                </StackPanel>
+                                                <!-- 卡片三层：主题 / 正文摘要 / 时间（+附件标记）；未读时左侧留一道主色竖标 -->
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="10" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Border Width="3"
+                                                            Margin="0,9"
+                                                            CornerRadius="1.5"
+                                                            HorizontalAlignment="Center"
+                                                            Background="{DynamicResource AccentBrush}"
+                                                            Visibility="{Binding IsUnread, Converter={StaticResource BoolToVisibility}}" />
+
+                                                    <StackPanel Grid.Column="1" Margin="0,7,9,7">
+                                                        <TextBlock Text="{Binding SubjectDisplay}"
+                                                                   FontSize="12.5"
+                                                                   TextTrimming="CharacterEllipsis">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="FontWeight" Value="Normal" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource Ink2Brush}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsUnread}" Value="True">
+                                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                                            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+
+                                                        <TextBlock Style="{StaticResource MutedText}"
+                                                                   FontSize="11.5"
+                                                                   Margin="0,3,0,0"
+                                                                   Text="{Binding PreviewDisplay}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}" />
+
+                                                        <Grid Margin="0,5,0,0">
+                                                            <TextBlock Style="{StaticResource MutedText}"
+                                                                       FontSize="11"
+                                                                       Text="{Binding DateDetailDisplay}" />
+                                                            <Path Style="{StaticResource IconPathSmall}"
+                                                                  Width="12"
+                                                                  Height="12"
+                                                                  Data="{StaticResource IcoPaperclip}"
+                                                                  Stroke="{DynamicResource MutedBrush}"
+                                                                  HorizontalAlignment="Right"
+                                                                  ToolTip="这封邮件带附件"
+                                                                  Visibility="{Binding HasAttachment, Converter={StaticResource BoolToVisibility}}" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Grid>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
@@ -2552,14 +2617,24 @@
                                     ToolTip="打印当前邮件（保留正文排版）">
                                 <Path Style="{StaticResource IconPathButton}" Data="{StaticResource IcoPrint}" />
                             </Button>
+                            <Button Style="{StaticResource IconBtn}"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="4,0,0,0"
+                                    Command="{Binding SummarizeCommand}"
+                                    IsEnabled="{Binding HasSelection}"
+                                    ToolTip="AI 总结当前邮件（本机生成，不联网）">
+                                <Path Style="{StaticResource IconPathButton}" Data="{StaticResource IcoSummary}" />
+                            </Button>
                         </WrapPanel>
                     </Border>
 
-                    <!-- 阅读区三段式：0 邮件头 / 1 正文 / 2 提示条。
+                    <!-- 阅读区四段式：0 邮件头 / 1 AI 摘要卡 / 2 正文 / 3 提示条。
                          正文区必须独立滚动：WebView2 为 HWND 承载，不能放进外层 ScrollViewer。 -->
                     <Grid Grid.Row="1"
                           Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
@@ -2576,6 +2651,43 @@
                                              FontWeight="SemiBold"
                                              Foreground="{DynamicResource InkBrush}"
                                              Text="{Binding Detail.SubjectDisplay, Mode=OneWay}" />
+
+                                    <!-- 退信：投递失败退回，红色提示条排在钓鱼 / 陌生之前（最需要立刻处理） -->
+                                    <Border Margin="0,10,0,0"
+                                            Padding="10,8"
+                                            CornerRadius="6"
+                                            Background="{DynamicResource CriticalSoftBrush}"
+                                            BorderBrush="{DynamicResource CriticalBrush}"
+                                            BorderThickness="1"
+                                            Visibility="{Binding ShowDetailBounce, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Path Grid.Column="0"
+                                                  Style="{StaticResource IconPathSmall}"
+                                                  VerticalAlignment="Center"
+                                                  Stroke="{DynamicResource CriticalBrush}"
+                                                  Data="{StaticResource IcoAlert}" />
+                                            <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="投递失败 · 这封是退信"
+                                                           FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource CriticalBrush}" />
+                                                <TextBlock Text="{Binding DetailBounceLine}"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="11.5"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource Ink2Brush}" />
+                                                <TextBlock Text="这封邮件没有送达收件人，请换地址重发或电话确认，不要当成已送出。"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="11.5"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource MutedBrush}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
 
                                     <!-- 疑似钓鱼：发件人域名与本机企业域名高度相似，红色警示排在陌生提示之前 -->
                                     <Border Margin="0,10,0,0"
@@ -3156,10 +3268,15 @@
                             </ScrollViewer>
                         </Border>
 
-                        <!-- 区段 1：正文（内部滚动） -->
-                        <Grid Grid.Row="1">
-                            <!-- 正文下载中先隐藏正文区：邮件头已经可读，正文区让位给加载态 -->
-                            <Grid Visibility="{Binding ShowBodyView, Converter={StaticResource BoolToVisibility}}">
+                        <!-- 区段 1：AI 摘要卡（收起时不占位） -->
+                        <ct:MailSummaryCard Grid.Row="1" Margin="16,12,16,0" DataContext="{Binding Summary}" />
+
+                        <!-- 区段 2：正文（内部滚动） -->
+                        <Grid Grid.Row="2">
+                            <!-- 正文下载中 / 需要用户重新获取时整块收起来：邮件头已经可读，正文区让位给占位。
+                                 注意：WebView2 是独立 HWND，只要它还在渲染就会盖住同层的 WPF 元素，
+                                 所以「重新获取正文」卡片出现时必须把这块连同 WebView2 一起隐藏。 -->
+                            <Grid Visibility="{Binding ShowBodyContent, Converter={StaticResource BoolToVisibility}}">
                                 <views:MailBodyView x:Name="BodyView"
                                                     UseHtml="{Binding UseHtmlRendering}"
                                                     Document="{Binding BodyHtmlDocument}"
@@ -3224,8 +3341,8 @@
                             </Border>
                         </Grid>
 
-                        <!-- 区段 2：正文提示条（远程图片默认阻止，按需放行） -->
-                        <Border Grid.Row="2"
+                        <!-- 区段 3：正文提示条（远程图片默认阻止，按需放行） -->
+                        <Border Grid.Row="3"
                                 Padding="18,8"
                                 BorderBrush="{DynamicResource RuleBrush}"
                                 BorderThickness="0,1,0,0"
@@ -3283,10 +3400,11 @@
 
             <!-- ============ 状态栏 ============ -->
             <Border Grid.Row="4"
+                    Height="32"
                     Background="{DynamicResource ChromeBrush}"
                     BorderBrush="{DynamicResource RuleBrush}"
                     BorderThickness="0,1,0,0"
-                    Padding="14,6">
+                    Padding="14,4">
                 <Grid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Ellipse Width="7" Height="7" Fill="{DynamicResource OkDotBrush}" VerticalAlignment="Center" />
@@ -3309,7 +3427,7 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <!-- 升级标识：只在发现新版本 / 下载中 / 待安装时出现，点击打开升级窗口 -->
-                        <Button Style="{StaticResource BtnGhost}"
+                        <Button Style="{StaticResource StatusBarButton}"
                                 Padding="6,0"
                                 Margin="0,0,8,0"
                                 VerticalAlignment="Center"
@@ -3326,7 +3444,7 @@
                                            Text="{Binding UpdateBadgeText}" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource BtnGhost}"
+                        <Button Style="{StaticResource StatusBarButton}"
                                 Padding="4,0"
                                 Margin="0,0,6,0"
                                 VerticalAlignment="Center"
@@ -3335,7 +3453,7 @@
                                 ToolTip="撤销最近一次尚未同步到服务器的删除">
                             <TextBlock Style="{StaticResource MutedText}" Text="撤销删除" />
                         </Button>
-                        <Button Style="{StaticResource BtnGhost}"
+                        <Button Style="{StaticResource StatusBarButton}"
                                 Padding="4,0"
                                 Margin="0,0,6,0"
                                 VerticalAlignment="Center"
@@ -3364,17 +3482,13 @@
                                    VerticalAlignment="Center"
                                    Text="{Binding LocalTotal, StringFormat=本地数据库 {0} 封}" />
                         <Rectangle Style="{StaticResource VDivider}" Height="12" Margin="10,0" />
-                        <Button Style="{StaticResource BtnGhost}"
+                        <Button Style="{StaticResource StatusBarButton}"
                                 Padding="4,0"
                                 VerticalAlignment="Center"
                                 Command="{Binding OpenCleanupCommand}"
                                 ToolTip="查看本地存储占用详情并清理历史邮件">
                             <TextBlock Style="{StaticResource MutedText}" Text="{Binding StorageStatus}" />
                         </Button>
-                        <Rectangle Style="{StaticResource VDivider}" Height="12" Margin="10,0" />
-                        <TextBlock Style="{StaticResource MutedText}"
-                                   VerticalAlignment="Center"
-                                   Text="MailKit · IMAP 993 / SMTP 465" />
                     </StackPanel>
                 </Grid>
             </Border>

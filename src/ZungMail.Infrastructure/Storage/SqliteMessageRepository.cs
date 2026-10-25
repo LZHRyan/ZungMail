@@ -15,7 +15,8 @@ public sealed class SqliteMessageRepository : IMessageRepository
     private const string Cols =
         "m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.thread_id, m.subject, m.from_name, m.from_email, " +
         "m.to_json, m.cc_json, m.bcc_json, m.reply_to, m.references_json, m.date_utc, m.preview, m.flags, m.size, " +
-        "m.has_attachment, m.body_state, m.body_html, m.body_text, m.eml_path, m.mdn_to, m.mail_type, m.is_stranger";
+        "m.has_attachment, m.body_state, m.body_html, m.body_text, m.eml_path, m.mdn_to, m.mail_type, m.is_stranger, " +
+        "m.is_bounce, m.bounce_recipient, m.bounce_status, m.bounce_detail";
 
     /// <summary>
     /// 列表 / 会话查询用的列清单：把正文两列换成空串常量。
@@ -26,10 +27,11 @@ public sealed class SqliteMessageRepository : IMessageRepository
     private const string SummaryCols =
         "m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.thread_id, m.subject, m.from_name, m.from_email, " +
         "m.to_json, m.cc_json, m.bcc_json, m.reply_to, m.references_json, m.date_utc, m.preview, m.flags, m.size, " +
-        "m.has_attachment, m.body_state, '' AS body_html, '' AS body_text, m.eml_path, m.mdn_to, m.mail_type, m.is_stranger";
+        "m.has_attachment, m.body_state, '' AS body_html, '' AS body_text, m.eml_path, m.mdn_to, m.mail_type, m.is_stranger, " +
+        "m.is_bounce, m.bounce_recipient, m.bounce_status, m.bounce_detail";
 
-    // 会话分组键：thread_id 为空时用 local:<id> 让每封邮件自成一组。
-    private const string ThreadKey = "COALESCE(NULLIF(m.thread_id, ''), 'local:' || m.id)";
+    // 会话分组键：迁移 v24 起是 messages 上的虚拟生成列（带索引），会话列表分组与回查都能走索引。
+    private const string ThreadKey = "m.thread_key";
 
     private readonly SqliteConnectionFactory _factory;
 
@@ -145,10 +147,10 @@ public sealed class SqliteMessageRepository : IMessageRepository
                 }
             }
 
+            var itemsByKey = await LoadThreadItemsAsync(connection, keys, ct).ConfigureAwait(false);
             foreach (var key in keys)
             {
-                var items = await LoadThreadItemsAsync(connection, key, ct).ConfigureAwait(false);
-                if (items.Count == 0) continue;
+                if (!itemsByKey.TryGetValue(key, out var items) || items.Count == 0) continue;
                 var representative = items[0]; // 查询按日期倒序，首封即最新
                 items.Reverse();               // Items 按时间升序，便于阅读
                 groups.Add(new ThreadGroup
@@ -171,20 +173,36 @@ public sealed class SqliteMessageRepository : IMessageRepository
         };
     }
 
-    private static async Task<List<EmailSummary>> LoadThreadItemsAsync(
-        SqliteConnection connection, string threadKey, CancellationToken ct)
+    /// <summary>一次 IN 查询取回整页所有会话的邮件（原来按每个会话各查一次，一页 100 行就是 100 次全表扫）。</summary>
+    private static async Task<Dictionary<string, List<EmailSummary>>> LoadThreadItemsAsync(
+        SqliteConnection connection, IReadOnlyList<string> threadKeys, CancellationToken ct)
     {
+        var result = new Dictionary<string, List<EmailSummary>>(StringComparer.Ordinal);
+        if (threadKeys.Count == 0) return result;
+
+        var placeholders = string.Join(',', Enumerable.Range(0, threadKeys.Count).Select(i => "@tk" + i));
         await using var command = connection.CreateCommand();
         command.CommandText =
-            $"SELECT {SummaryCols} FROM messages m WHERE {ThreadKey} = @tk ORDER BY m.date_utc DESC, m.id DESC;";
-        command.Parameters.AddWithValue("@tk", threadKey);
-        var items = new List<EmailSummary>();
+            $"SELECT {SummaryCols}, m.thread_key AS tk FROM messages m " +
+            $"WHERE m.thread_key IN ({placeholders}) ORDER BY m.date_utc DESC, m.id DESC;";
+        for (var i = 0; i < threadKeys.Count; i++)
+        {
+            command.Parameters.AddWithValue("@tk" + i, threadKeys[i]);
+        }
+
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        var keyIndex = reader.FieldCount - 1;
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
+            var key = SqlConvert.Str(reader, keyIndex);
+            if (!result.TryGetValue(key, out var items))
+            {
+                items = new List<EmailSummary>();
+                result[key] = items;
+            }
             items.Add(MapSummary(reader));
         }
-        return items;
+        return result;
     }
 
     public async Task<EmailDetail?> GetDetailAsync(long id, CancellationToken ct = default)
@@ -369,10 +387,12 @@ SELECT LOWER(from_email) FROM messages WHERE from_email COLLATE NOCASE IN ({list
 INSERT INTO messages(account_id, folder_id, uid, message_id, thread_id, subject, from_name, from_email,
                      to_json, cc_json, bcc_json, reply_to, references_json, date_utc, preview, flags, size,
                      has_attachment, body_state, body_html, body_text, mdn_to, is_stranger,
+                     is_bounce, bounce_recipient, bounce_status, bounce_detail,
                      fts_subject, fts_from, fts_to, fts_body)
 VALUES(@accountId, @folderId, @uid, @messageId, @threadId, @subject, @fromName, @fromEmail,
        @to, @cc, @bcc, @replyTo, @references, @date, @preview, @flags, @size,
        @hasAttachment, @bodyState, @bodyHtml, @bodyText, @mdnTo, @isStranger,
+       @isBounce, @bounceRecipient, @bounceStatus, @bounceDetail,
        @ftsSubject, @ftsFrom, @ftsTo, @ftsBody)
 ON CONFLICT(folder_id, uid) DO UPDATE SET
     message_id       = excluded.message_id,
@@ -396,6 +416,11 @@ ON CONFLICT(folder_id, uid) DO UPDATE SET
     body_text        = CASE WHEN messages.body_state = 1 AND excluded.body_state = 0 THEN messages.body_text ELSE excluded.body_text END,
     -- 陌生标识是「收信那一刻」的历史结论：已标记的邮件不会因为后续 upsert（补正文 / 重新拉摘要）被洗掉
     is_stranger      = CASE WHEN messages.is_stranger = 1 THEN 1 ELSE excluded.is_stranger END,
+    -- 退信同理：判定结论与已解析的细节都保留（重新拉摘要不带细节时不能清空）
+    is_bounce        = CASE WHEN messages.is_bounce = 1 THEN 1 ELSE excluded.is_bounce END,
+    bounce_recipient = COALESCE(NULLIF(excluded.bounce_recipient, ''), messages.bounce_recipient),
+    bounce_status    = COALESCE(NULLIF(excluded.bounce_status, ''), messages.bounce_status),
+    bounce_detail    = COALESCE(NULLIF(excluded.bounce_detail, ''), messages.bounce_detail),
     fts_subject      = excluded.fts_subject,
     fts_from         = excluded.fts_from,
     fts_to           = excluded.fts_to,
@@ -428,6 +453,10 @@ SELECT id FROM messages WHERE folder_id = @folderId AND uid = @uid;
         command.Parameters.AddWithValue("@ftsTo", NormalizeTo(message));
         command.Parameters.AddWithValue("@mdnTo", (object?)NullIfEmpty(message.MdnTo) ?? DBNull.Value);
         command.Parameters.AddWithValue("@isStranger", message.IsStranger ? 1 : 0);
+        command.Parameters.AddWithValue("@isBounce", message.IsBounce ? 1 : 0);
+        command.Parameters.AddWithValue("@bounceRecipient", message.BounceRecipient ?? string.Empty);
+        command.Parameters.AddWithValue("@bounceStatus", message.BounceStatus ?? string.Empty);
+        command.Parameters.AddWithValue("@bounceDetail", message.BounceDetail ?? string.Empty);
         command.Parameters.AddWithValue("@ftsBody", NormalizeBody(message));
 
         var id = Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false) ?? 0L);
@@ -658,6 +687,28 @@ SELECT id FROM messages WHERE folder_id = @folderId AND uid = @uid;
         }
 
         return removed;
+    }
+
+    public async Task UpdateBounceAsync(
+        long id, bool isBounce, string recipient, string status, string detail, CancellationToken ct = default)
+    {
+        await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        // 空串表示「本次没解析出来」：保留库中原值，避免重新下载正文把已有细节洗掉
+        command.CommandText = """
+UPDATE messages SET
+    is_bounce        = CASE WHEN @isBounce = 1 THEN 1 ELSE is_bounce END,
+    bounce_recipient = COALESCE(NULLIF(@recipient, ''), bounce_recipient),
+    bounce_status    = COALESCE(NULLIF(@status, ''), bounce_status),
+    bounce_detail    = COALESCE(NULLIF(@detail, ''), bounce_detail)
+WHERE id = @id;
+""";
+        command.Parameters.AddWithValue("@isBounce", isBounce ? 1 : 0);
+        command.Parameters.AddWithValue("@recipient", recipient ?? string.Empty);
+        command.Parameters.AddWithValue("@status", status ?? string.Empty);
+        command.Parameters.AddWithValue("@detail", detail ?? string.Empty);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public async Task SaveBodyAsync(long id, string bodyHtml, string bodyText, IReadOnlyList<AttachmentInfo> attachments, CancellationToken ct = default)
@@ -1083,7 +1134,11 @@ FROM messages;
         Size = SqlConvert.Long(reader, 17),
         HasAttachment = SqlConvert.Bool(reader, 18),
         IndustryType = (MailType)SqlConvert.Int(reader, 24),
-        IsStranger = SqlConvert.Bool(reader, 25)
+        IsStranger = SqlConvert.Bool(reader, 25),
+        IsBounce = SqlConvert.Bool(reader, 26),
+        BounceRecipient = SqlConvert.Str(reader, 27),
+        BounceStatus = SqlConvert.Str(reader, 28),
+        BounceDetail = SqlConvert.Str(reader, 29)
     };
 
     private static EmailDetail MapDetail(SqliteDataReader reader)
@@ -1113,7 +1168,11 @@ FROM messages;
             BodyText = SqlConvert.Str(reader, 21),
             MdnTo = SqlConvert.StrOrNull(reader, 22) ?? "",
             IndustryType = (MailType)SqlConvert.Int(reader, 24),
-            IsStranger = SqlConvert.Bool(reader, 25)
+            IsStranger = SqlConvert.Bool(reader, 25),
+            IsBounce = SqlConvert.Bool(reader, 26),
+            BounceRecipient = SqlConvert.Str(reader, 27),
+            BounceStatus = SqlConvert.Str(reader, 28),
+            BounceDetail = SqlConvert.Str(reader, 29)
         };
 
         var replyTo = SqlConvert.Str(reader, 12);

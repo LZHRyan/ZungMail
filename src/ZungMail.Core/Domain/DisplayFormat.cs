@@ -48,6 +48,23 @@ public static class DisplayFormat
     public static string FullDate(DateTimeOffset value)
         => value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// 卡片上的时间显示：比 <see cref="RelativeDate"/> 多带时分。
+    /// 同一发件人的往来邮件经常同一天连着几封，只写「昨天」分不出先后，所以拼上 HH:mm。
+    /// </summary>
+    public static string RelativeDateTime(DateTimeOffset value)
+    {
+        var local = value.ToLocalTime();
+        var today = DateTimeOffset.Now.Date;
+        var day = local.Date;
+        var time = local.ToString("HH:mm", CultureInfo.InvariantCulture);
+
+        if (day == today) return time;
+        if (day == today.AddDays(-1)) return "昨天 " + time;
+        if (day.Year == today.Year) return local.ToString("MM-dd", CultureInfo.InvariantCulture) + " " + time;
+        return local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
     /// <summary>文件大小显示。</summary>
     public static string FileSize(long bytes)
     {

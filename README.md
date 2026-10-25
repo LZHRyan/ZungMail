@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
   <img src="docs/brand/zungmail-logo/png/zungmail-128.png" width="96" alt="ZungMail" />
   <h1>ZungMail</h1>
   <p><strong>面向货代业务的 Windows 邮件工作台</strong><br />
@@ -8,7 +8,7 @@
     <img alt=".net" src="https://img.shields.io/badge/.NET-8.0-512bd4" />
     <img alt="ui" src="https://img.shields.io/badge/UI-WPF%20%2B%20WebView2-6b4fbb" />
     <img alt="license" src="https://img.shields.io/badge/license-MIT-2ea44f" />
-    <img alt="version" src="https://img.shields.io/badge/version-1.2.1-6b7280" />
+    <img alt="version" src="https://img.shields.io/badge/version-1.3.4-6b7280" />
   </p>
 </div>
 

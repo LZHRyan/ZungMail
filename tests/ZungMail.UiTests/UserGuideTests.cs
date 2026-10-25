@@ -115,6 +115,21 @@ public sealed class UserGuideTests
     }
 
     [Fact]
+    public void 教程说明AI总结入口与本机推理边界()
+    {
+        var path = UserGuide.ResolvePath(AppContext.BaseDirectory);
+        Assert.True(File.Exists(path), "教程未复制到输出目录：" + path);
+
+        var html = File.ReadAllText(path);
+
+        Assert.Contains("AI 总结", html);
+        // 本机推理与降级路径必须写清楚
+        Assert.Contains("规则抽取", html);
+        Assert.Contains("本地 AI 助手", html);
+        Assert.Contains("不出本机", html);
+    }
+
+    [Fact]
     public void 设置关于页_保留打开使用教程入口()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Views", "SettingsWindow.xaml");

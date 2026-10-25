@@ -65,9 +65,17 @@ public sealed class CleanupFilter
     /// <summary>保护未读邮件（默认开启）。</summary>
     public bool ProtectUnread { get; set; } = true;
 
+    /// <summary>
+    /// 仅清正文与附件：命中邮件本身保留（邮件头、文件夹、标志都不动），
+    /// 只清空已下载的正文、删掉附件记录与 <c>eml</c> 下的附件文件。
+    /// 这种模式不写隔离区快照，因此不可撤销；阅读时按需重新下载。
+    /// </summary>
+    public bool ClearBodyOnly { get; set; }
+
     public string Describe()
     {
         var parts = new List<string>();
+        if (ClearBodyOnly) parts.Add("仅清正文与附件（保留邮件头）");
         if (BeforeUtc is { } before) parts.Add($"{before.LocalDateTime:yyyy-MM-dd} 之前");
         if (AfterUtc is { } after) parts.Add($"{after.LocalDateTime:yyyy-MM-dd} 之后");
         if (MinSizeBytes > 0) parts.Add($"大于 {DisplayFormat.FileSize(MinSizeBytes)}");
@@ -109,8 +117,15 @@ public sealed class CleanupPreview
     public long TotalBytes { get; init; }
     public long AttachmentBytes { get; init; }
 
+    /// <summary>
+    /// 按当前模式预计能释放的字节数：整封删除＝邮件本身 + 附件；
+    /// 「仅清正文与附件」＝已下载正文长度 + 附件大小（预告口径与实际清理一致）。
+    /// </summary>
+    public long ReclaimableBytes { get; init; }
+
     public string TotalCountDisplay => $"{TotalCount:N0} 封";
     public string TotalSizeDisplay => DisplayFormat.FileSize(TotalBytes + AttachmentBytes);
+    public string ReclaimableDisplay => DisplayFormat.FileSize(ReclaimableBytes);
 }
 
 /// <summary>清理任务（可追溯的审计记录）。</summary>
@@ -128,30 +143,37 @@ public sealed class CleanupJob
     public DateTimeOffset? FinishedUtc { get; set; }
     public string Note { get; set; } = "";
 
-    public bool CanUndo => Status is CleanupStatus.Completed or CleanupStatus.Cancelled;
-    public bool CanPurge => Status is CleanupStatus.Completed or CleanupStatus.Cancelled;
+    /// <summary>
+    /// 是否正确入档为「仅清正文与附件」任务。该模式不写隔离区快照，
+    /// 因此没有可撤销 / 可彻底删除的数据；从 <see cref="FilterJson"/> 反序列化得到。
+    /// </summary>
+    public bool IsBodyOnly { get; set; }
+
+    public bool CanUndo => !IsBodyOnly && Status is CleanupStatus.Completed or CleanupStatus.Cancelled;
+    public bool CanPurge => !IsBodyOnly && Status is CleanupStatus.Completed or CleanupStatus.Cancelled;
     public bool CanResume => Status == CleanupStatus.Cancelled;
 
     public string ModeDisplay => Mode switch
     {
-        CleanupMode.Selected => "手动勾选",
+        CleanupMode.Selected => IsBodyOnly ? "手动勾选 · 仅清正文" : "手动勾选",
         CleanupMode.Auto => "自动清理",
-        _ => "按条件一键清理"
+        _ => IsBodyOnly ? "按条件 · 仅清正文" : "按条件一键清理"
     };
 
     public string StatusDisplay => Status switch
     {
         CleanupStatus.Running => "进行中",
-        CleanupStatus.Completed => "已完成（可撤销）",
-        CleanupStatus.Cancelled => "已中断（可撤销/恢复）",
+        CleanupStatus.Completed => IsBodyOnly ? "已完成（仅清正文，不可撤销）" : "已完成（可撤销）",
+        CleanupStatus.Cancelled => IsBodyOnly ? "已中断（可恢复）" : "已中断（可撤销/恢复）",
         CleanupStatus.Undone => "已撤销",
         CleanupStatus.Purged => "已彻底删除",
         _ => "未知"
     };
 
-    public string SummaryDisplay =>
-        $"{ProcessedCount:N0} / {TotalCount:N0} 封 · 待释放 {DisplayFormat.FileSize(TotalBytes)}"
-        + (FreedBytes > 0 ? $" · 已释放 {DisplayFormat.FileSize(FreedBytes)}" : "");
+    public string SummaryDisplay => IsBodyOnly
+        ? $"{ProcessedCount:N0} / {TotalCount:N0} 封 · 已清空正文与附件 {DisplayFormat.FileSize(TotalBytes)}"
+        : $"{ProcessedCount:N0} / {TotalCount:N0} 封 · 待释放 {DisplayFormat.FileSize(TotalBytes)}"
+          + (FreedBytes > 0 ? $" · 已释放 {DisplayFormat.FileSize(FreedBytes)}" : "");
 
     public string StartedDisplay => DisplayFormat.FullDate(StartedUtc);
 

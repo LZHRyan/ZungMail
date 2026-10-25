@@ -26,6 +26,9 @@ public sealed class OutboxScheduler : BackgroundService
     {
         StartupTrace.Mark("定时器 Outbox 进入");
 
+        // 首轮里的 DB 调用是「假异步」（同步完成），会占住调用 Host.StartAsync 的线程；先让出调度器
+        await Task.Yield();
+
         // 先回收上次异常退出残留的「发送中」：服务器可能已接受，结果未知，不能自动重发。
         try
         {

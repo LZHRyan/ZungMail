@@ -45,6 +45,48 @@ public class EmailSummary
     /// <summary>界面提示用：陌生发件人的说明文案。</summary>
     public string StrangerHint => "首次收到该地址来信，注意核对附件、账号与付款信息";
 
+    /// <summary>
+    /// 退信（投递失败退回）：入库时按 MIME 结构 / 发件人 / 主题判定（见 <c>BounceMailPolicy</c>），
+    /// 正文下载后再解析 delivery-status 补全细节。存量邮件与全量重同步一律为 false。
+    /// </summary>
+    public bool IsBounce { get; set; }
+
+    /// <summary>退信里的失败收件人（Final-Recipient），未解析出来时为空。</summary>
+    public string BounceRecipient { get; set; } = "";
+
+    /// <summary>退信里的 SMTP 状态码（Status），如 5.1.1。</summary>
+    public string BounceStatus { get; set; } = "";
+
+    /// <summary>退信里的诊断信息（Diagnostic-Code），如 550 5.1.1 User unknown。</summary>
+    public string BounceDetail { get; set; } = "";
+
+    /// <summary>是否解析出了具体的失败收件人 / 状态码 / 诊断。</summary>
+    public bool HasBounceInfo =>
+        !string.IsNullOrWhiteSpace(BounceRecipient) ||
+        !string.IsNullOrWhiteSpace(BounceStatus) ||
+        !string.IsNullOrWhiteSpace(BounceDetail);
+
+    /// <summary>列表角标的悬停提示。</summary>
+    public string BounceHint => HasBounceInfo
+        ? $"退信：{BounceDetailLine}"
+        : "退信：这封邮件没有送达收件人";
+
+    /// <summary>阅读区提示条第二行：有细节列细节，没有就引导去看正文。</summary>
+    public string BounceDetailLine
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(BounceRecipient)) parts.Add($"收件人 {BounceRecipient}");
+
+            var code = string.Join(' ', new[] { BounceStatus, BounceDetail }
+                .Where(part => !string.IsNullOrWhiteSpace(part)));
+            if (code.Length > 0) parts.Add(code);
+
+            return parts.Count > 0 ? string.Join(" · ", parts) : "展开正文查看失败原因";
+        }
+    }
+
     // ---- 派生属性（供界面直接绑定）----
     public bool IsUnread => (Flags & MessageFlags.Seen) == 0;
     public bool IsStarred => (Flags & MessageFlags.Flagged) != 0;

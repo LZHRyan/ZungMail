@@ -75,6 +75,18 @@ public interface IMessageRepository
 
     Task SaveBodyAsync(long id, string bodyHtml, string bodyText, IReadOnlyList<AttachmentInfo> attachments, CancellationToken ct = default);
 
+    /// <summary>
+    /// 回填退信细节（失败收件人 / SMTP 状态码 / 诊断）：正文下载后解析 delivery-status 才有值。
+    /// 传空串表示该项未知，库中原值保留。
+    /// </summary>
+    Task UpdateBounceAsync(
+        long id,
+        bool isBounce,
+        string recipient,
+        string status,
+        string detail,
+        CancellationToken ct = default);
+
     Task DeleteAsync(long id, CancellationToken ct = default);
 
     Task DeleteByFolderAsync(long folderId, CancellationToken ct = default);

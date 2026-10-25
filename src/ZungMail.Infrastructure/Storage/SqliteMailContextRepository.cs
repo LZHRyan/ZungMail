@@ -19,7 +19,8 @@ public sealed class SqliteMailContextRepository : IMailContextRepository
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-SELECT id, subject, from_name, date_utc, flags, folder_id
+SELECT id, subject, from_name, date_utc, flags, folder_id,
+       COALESCE(preview, ''), COALESCE(has_attachment, 0)
 FROM messages
 WHERE account_id = @accountId
   AND from_email = @email COLLATE NOCASE
@@ -43,7 +44,9 @@ LIMIT @take;
                 SqlConvert.Str(reader, 2),
                 SqlConvert.ParseDate(reader.GetString(3)),
                 (flags & MessageFlags.Seen) == 0,
-                SqlConvert.Long(reader, 5)));
+                SqlConvert.Long(reader, 5),
+                SqlConvert.Str(reader, 6),
+                SqlConvert.Int(reader, 7) != 0));
         }
         return items;
     }

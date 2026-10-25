@@ -88,6 +88,21 @@ public sealed partial class MailRow : ObservableObject
 
     partial void OnStrangerBadgeEnabledChanged(bool value) => OnPropertyChanged(nameof(StrangerBadgeVisible));
 
+    /// <summary>退信（投递失败退回）：收信时判定，正文下载后补全失败收件人与状态码。</summary>
+    public bool IsBounce => Model.IsBounce;
+
+    /// <summary>设置里「标记退信邮件」开关；关闭后角标立即消失但数据仍保留。</summary>
+    [ObservableProperty]
+    private bool _bounceBadgeEnabled = true;
+
+    /// <summary>列表角标可见性：既是退信，且用户没有关掉这个提示。</summary>
+    public bool BounceBadgeVisible => IsBounce && BounceBadgeEnabled;
+
+    /// <summary>退信角标的悬停提示（含失败收件人与状态码，有则显示）。</summary>
+    public string BounceHint => Model.BounceHint;
+
+    partial void OnBounceBadgeEnabledChanged(bool value) => OnPropertyChanged(nameof(BounceBadgeVisible));
+
     /// <summary>
     /// 仿冒域名（钓鱼）判定结论：呈现时由主视图模型算好塞进来，不落库；无风险为 null。
     /// </summary>

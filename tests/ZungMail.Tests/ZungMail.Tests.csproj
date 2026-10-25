@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\src\ZungMail.Infrastructure\ZungMail.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\ZungMail.Mail\ZungMail.Mail.csproj" />
     <ProjectReference Include="..\..\src\ZungMail.Update.Protocol\ZungMail.Update.Protocol.csproj" />
+    <!-- 摘要引擎插件：用假推理验证提示词与解析，不加载真实模型 -->
+    <ProjectReference Include="..\..\src\ZungMail.Summary.LocalModel\ZungMail.Summary.LocalModel.csproj" />
   </ItemGroup>
 
 </Project>

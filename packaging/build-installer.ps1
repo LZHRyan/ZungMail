@@ -60,6 +60,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# dotnet CLI 兼容层：CLI 在本机可能因系统服务枚举缺陷崩溃（0xC0000005），
+# publish 失败时自动退回 dotnet exec MSBuild.dll。
+. (Join-Path $PSScriptRoot 'dotnet-cli.ps1')
+
 # 让中文输出在非交互宿主（CI / 终端）里也按 UTF-8 呈现
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
 
@@ -161,25 +165,22 @@ else {
     # 实测装在 C:\Program Files 且过杀软实时扫描的机器上，这一段能省十几秒；代价是产物约翻倍。
     # 体积优先时用 -NoReadyToRun 关掉。
     $readyToRun = if ($NoReadyToRun) { 'false' } else { 'true' }
-    $publishArgs = @(
-        'publish', $appProject,
-        '-c', $Configuration,
-        '-r', $Runtime,
-        '--self-contained', $selfContained,
-        '-o', $publishDir,
-        '-p:DebugType=None',
-        '-p:DebugSymbols=false',
-        '-p:PlatformTarget=x64',
-        '-p:Platform=x64',
-        '-p:PublishSingleFile=false',
-        "-p:PublishReadyToRun=$readyToRun",
-        '-p:PublishTrimmed=false',
-        '--nologo',
-        '--verbosity', 'minimal'
-    )
 
-    & dotnet @publishArgs
-    if ($LASTEXITCODE -ne 0) { Fail "dotnet publish 退出码 $LASTEXITCODE" }
+    try {
+        Invoke-DotNetPublishCompat -Project $appProject -PublishDir $publishDir -Configuration $Configuration `
+            -Runtime $Runtime -SelfContained ($selfContained -eq 'true') `
+            -ExtraProperties @{
+                DebugType           = 'None'
+                DebugSymbols        = 'false'
+                PublishSingleFile   = 'false'
+                PublishReadyToRun   = $readyToRun
+                PublishTrimmed      = 'false'
+            } `
+            -ExtraArguments @('--nologo', '--verbosity', 'minimal')
+    }
+    catch {
+        Fail $_.Exception.Message
+    }
     if (-not (Test-Path (Join-Path $publishDir 'ZungMail.exe'))) { Fail "发布输出里没有 ZungMail.exe" }
 
     Get-ChildItem $publishDir -Recurse -Include *.pdb,*.xml -File -ErrorAction SilentlyContinue | Remove-Item -Force

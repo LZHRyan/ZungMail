@@ -27,6 +27,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# dotnet CLI 兼容层：某些机器上 CLI 会因系统服务枚举缺陷崩溃（0xC0000005），
+# 这里在 publish / wix 失败时自动退回 dotnet exec MSBuild.dll 或缓存里的 wix.dll。
+. (Join-Path $PSScriptRoot 'dotnet-cli.ps1')
+
 $root = Split-Path -Parent $PSScriptRoot
 $appProject = Join-Path $root 'src\ZungMail.App\ZungMail.App.csproj'
 $publishDir = Join-Path $PSScriptRoot 'obj\msi-publish'
@@ -71,14 +75,8 @@ if (-not $SkipPublish) {
     Stop-RunningClient
     Write-Host "==> dotnet publish → $publishDir"
     if (Test-Path -LiteralPath $publishDir) { Remove-Item -LiteralPath $publishDir -Recurse -Force }
-    & dotnet publish $appProject `
-        -c $Configuration `
-        -r win-x64 `
-        --self-contained true `
-        -p:PlatformTarget=x64 `
-        -p:Platform=x64 `
-        -o $publishDir
-    if ($LASTEXITCODE -ne 0) { throw "dotnet publish 失败（退出码 $LASTEXITCODE）。" }
+    Invoke-DotNetPublishCompat -Project $appProject -PublishDir $publishDir -Configuration $Configuration `
+        -Runtime 'win-x64' -SelfContained $true
 }
 else {
     Write-Host "==> 复用发布目录：$publishDir"
@@ -103,10 +101,8 @@ $signTargets = @($clientExe) +
 & (Join-Path $PSScriptRoot 'sign.ps1') -Path $signTargets
 
 Write-Host "==> 恢复 WiX 本地工具"
-& dotnet tool restore
-if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore 失败（退出码 $LASTEXITCODE）。" }
-& dotnet wix --version
-if ($LASTEXITCODE -ne 0) { throw "找不到本地 wix 工具。" }
+Invoke-DotNetToolRestoreCompat
+Invoke-WixCompat -WixArguments @('--version')
 
 if (-not (Test-Path -LiteralPath $wixDir)) { New-Item -ItemType Directory -Force -Path $wixDir | Out-Null }
 Write-Host "==> 生成 WiX 源"
@@ -121,8 +117,7 @@ $msiPath = Join-Path $OutputDir $msiName
 if (Test-Path -LiteralPath $msiPath) { Remove-Item -LiteralPath $msiPath -Force }
 
 Write-Host "==> 编译 MSI（x64）"
-& dotnet wix build $wxsPath -arch x64 -b $publishDir -o $msiPath
-if ($LASTEXITCODE -ne 0) { throw "wix build 失败（退出码 $LASTEXITCODE）。" }
+Invoke-WixCompat -WixArguments @('build', $wxsPath, '-arch', 'x64', '-b', $publishDir, '-o', $msiPath)
 
 $pdbPath = [IO.Path]::ChangeExtension($msiPath, '.wixpdb')
 if (Test-Path -LiteralPath $pdbPath) { Remove-Item -LiteralPath $pdbPath -Force }

@@ -1,5 +1,6 @@
 using ZungMail.Application.Services;
 using ZungMail.Core.Abstractions;
+using ZungMail.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ZungMail.Application.DependencyInjection;
@@ -31,6 +32,10 @@ public static class ServiceCollectionExtensions
         // 否则一边发起加载会把另一边的结果判为过期。
         services.AddTransient<MessageDetailLoader>();
         services.AddSingleton<MailActionService>();
+
+        // 邮件摘要：规则抽取引擎零依赖、永远可用；本地小模型引擎由插件模块另行注册。
+        services.AddSingleton<IMailSummaryProvider, RuleBasedMailSummarizer>();
+        services.AddSingleton<IMailSummaryService, MailSummaryService>();
         return services;
     }
 }

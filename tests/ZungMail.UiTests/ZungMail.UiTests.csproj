@@ -84,6 +84,10 @@
     <None Include="..\..\src\ZungMail.App\Views\MainWindow.xaml"
           Link="Views\MainWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <!-- 邮件摘要：卡片结构与阅读区入口回归 -->
+    <None Include="..\..\src\ZungMail.App\Controls\MailSummaryCard.xaml"
+          Link="Controls\MailSummaryCard.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
     <!-- 查看邮件源码：窗口结构、右键入口与只读文本框回归 -->
     <None Include="..\..\src\ZungMail.App\Views\MailSourceWindow.xaml"
           Link="Views\MailSourceWindow.xaml"
@@ -95,6 +99,10 @@
     <!-- 陌生发件人标识：独立阅读窗口的提示条 + App 级资源（图标/转换器）解析 -->
     <None Include="..\..\src\ZungMail.App\Views\MailReaderWindow.xaml"
           Link="Views\MailReaderWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 历史邮件清理：仅清正文与附件的选项、按钮文案与说明回归 -->
+    <None Include="..\..\src\ZungMail.App\Views\CleanupWindow.xaml"
+          Link="Views\CleanupWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\ZungMail.App\App.xaml"
           Link="App.xaml"

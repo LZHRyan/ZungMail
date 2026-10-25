@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -36,6 +36,9 @@
     <ProjectReference Include="..\ZungMail.Core\ZungMail.Core.csproj" />
     <ProjectReference Include="..\ZungMail.Infrastructure\ZungMail.Infrastructure.csproj" />
     <ProjectReference Include="..\ZungMail.Mail\ZungMail.Mail.csproj" />
+    <!-- 摘要引擎插件（LLamaSharp + CPU 原生库）：只保证程序集与原生库随包发布，
+         代码里通过反射注册（见 SummaryModuleCatalog），App 不直接依赖它的类型。 -->
+    <ProjectReference Include="..\ZungMail.Summary.LocalModel\ZungMail.Summary.LocalModel.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -60,6 +63,38 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- 把摘要引擎选中的原生库变体（avx2）摊平到输出/publish 根目录：
+       LLamaSharp 按名字在程序目录找 llama.dll，依赖 ggml*.dll / mtmd.dll 也必须在同一目录。 -->
+  <Target Name="FlattenLlamaNatives" AfterTargets="Build">
+    <ItemGroup>
+      <LlamaNativeBuild Include="$(OutDir)runtimes\win-x64\native\avx2\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LlamaNativeBuild)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
+  </Target>
+
+  <Target Name="FlattenLlamaNativesPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <LlamaNativePublish Include="$(PublishDir)runtimes\win-x64\native\avx2\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LlamaNativePublish)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <!-- 摊平后删掉 runtimes 下的指令集子目录：内容与根目录重复，留着只会让安装包多几 MB
+         （这些目录里只有 llama / ggml / mtmd，其他原生库如 e_sqlite3 在 runtimes\win-x64\native 根上）。 -->
+    <RemoveDir Directories="$(PublishDir)runtimes\win-x64\native\avx;$(PublishDir)runtimes\win-x64\native\avx2;$(PublishDir)runtimes\win-x64\native\avx512;$(PublishDir)runtimes\win-x64\native\noavx"
+               ContinueOnError="true" />
+  </Target>
+  <!-- 摘要引擎插件的原生库只保留 Windows x64：LLamaSharp 包内带 linux / macOS 各 RID，
+       发布时会一起拷出来（约 66 MB），安装包不该为用不到的平台付这份体积。 -->
+  <Target Name="TrimForeignLlamaNatives" AfterTargets="Publish">
+    <ItemGroup>
+      <ForeignNative Include="$(PublishDir)runtimes\linux-*\**\*" />
+      <ForeignNative Include="$(PublishDir)runtimes\osx-*\**\*" />
+      <ForeignNative Include="$(PublishDir)runtimes\win-arm64\**\*" />
+    </ItemGroup>
+    <Delete Files="@(ForeignNative)" ContinueOnError="true" />
+    <RemoveDir Directories="$(PublishDir)runtimes\linux-arm64;$(PublishDir)runtimes\linux-musl-x64;$(PublishDir)runtimes\linux-x64;$(PublishDir)runtimes\osx-arm64;$(PublishDir)runtimes\osx-x64;$(PublishDir)runtimes\win-arm64"
+               ContinueOnError="true" />
+  </Target>
 
 </Project>
 

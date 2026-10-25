@@ -29,6 +29,9 @@ public sealed partial class MailReaderViewModel : ObservableObject
     private readonly IAppPaths _paths;
     private readonly AvatarStore _avatars;
     private readonly IMailSourceWindowService _mailSourceWindows;
+
+    /// <summary>「AI 总结」卡片状态（独立阅读窗口自己一份）。</summary>
+    public MailSummaryViewModel Summary { get; }
     private readonly ILogger<MailReaderViewModel> _logger;
 
     /// <summary>本封邮件是否已放行远程图片（不持久化，切换邮件即复位）。</summary>
@@ -51,6 +54,7 @@ public sealed partial class MailReaderViewModel : ObservableObject
         IAppPaths paths,
         AvatarStore avatars,
         IMailSourceWindowService mailSourceWindows,
+        MailSummaryViewModel summary,
         ILogger<MailReaderViewModel> logger)
     {
         _detailLoader = detailLoader;
@@ -63,6 +67,7 @@ public sealed partial class MailReaderViewModel : ObservableObject
         _paths = paths;
         _avatars = avatars;
         _mailSourceWindows = mailSourceWindows;
+        Summary = summary;
         _logger = logger;
         _avatars.Changed += OnAvatarsChanged;
     }
@@ -184,6 +189,9 @@ public sealed partial class MailReaderViewModel : ObservableObject
                 EmlDirectory = EmlDirectory
             };
 
+            // 探针：绑定 getter，每次求值整篇重建 HTML
+            using var scope = UiThreadProbe.Measure("正文组装（阅读窗口）");
+
             if (string.IsNullOrWhiteSpace(Detail.BodyHtml) && string.IsNullOrWhiteSpace(Detail.BodyText))
             {
                 return HtmlMailDocumentBuilder.Build("<p class=\"mail-empty\">（此邮件暂无正文内容）</p>", options);
@@ -209,6 +217,17 @@ public sealed partial class MailReaderViewModel : ObservableObject
     /// 草稿不出现（正文是本地内容），规则见 <see cref="MailBodyRecovery"/>。
     /// </summary>
     public bool ShowReloadBodyButton => MailBodyRecovery.ShouldOfferReload(Detail, IsBodyLoading);
+
+    /// <summary>
+    /// 正文控件（含 WebView2）是否可见。
+    /// WebView2 是独立 HWND，永远盖在同一层 Grid 里的 WPF 元素之上——只要它还在渲染，
+    /// 叠在上面的「重新获取正文」卡片就看不见。所以需要卡片时把正文控件整块收起来。
+    /// </summary>
+    public bool ShowBodyContent => ShowBodyView && !ShowReloadBodyButton;
+
+    /// <summary>对当前邮件生成 AI 摘要（本机小模型；不可用自动退回规则抽取）。</summary>
+    [RelayCommand]
+    private async Task SummarizeAsync() => await Summary.ShowAsync(Detail).ConfigureAwait(true);
 
     /// <summary>查看当前邮件源码：优先服务器原始 MIME，取不到回退本地重建；只读，不改已读状态。</summary>
     [RelayCommand]
@@ -265,6 +284,12 @@ public sealed partial class MailReaderViewModel : ObservableObject
     /// <summary>陌生发件人提示：设置开关打开（默认开）且这封确实是首次来信。</summary>
     public bool ShowDetailStranger => _settings.Current.MarkStrangerSenders && Detail is { IsStranger: true };
 
+    /// <summary>退信提示：设置开关打开（默认开）且这封确实是投递失败退回的邮件。</summary>
+    public bool ShowDetailBounce => _settings.Current.MarkBounceMails && Detail is { IsBounce: true };
+
+    /// <summary>退信提示条第二行：失败收件人 / 状态码 / 诊断，没有细节时引导看正文。</summary>
+    public string DetailBounceLine => Detail?.BounceDetailLine ?? "";
+
     // ---------------- 仿冒域名（钓鱼警示） ----------------
 
     /// <summary>自有企业域名（去掉公共邮箱域）；每次打开邮件时刷新一次。</summary>
@@ -313,6 +338,9 @@ public sealed partial class MailReaderViewModel : ObservableObject
         // 远程图片放行只对当前这封邮件生效
         _loadRemoteImages = false;
 
+        // 换邮件就收起上一封的摘要
+        Summary.Reset();
+
         RefreshDetailPhishing();
         OnPropertyChanged(nameof(HasDetail));
         OnPropertyChanged(nameof(DetailAvatarBrush));
@@ -327,11 +355,14 @@ public sealed partial class MailReaderViewModel : ObservableObject
         OnPropertyChanged(nameof(BodyHtmlDocument));
         OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
         OnPropertyChanged(nameof(ShowDetailStranger));
+        OnPropertyChanged(nameof(ShowDetailBounce));
+        OnPropertyChanged(nameof(DetailBounceLine));
         OnPropertyChanged(nameof(ShowLoading));
         OnPropertyChanged(nameof(ShowPlaceholder));
         OnPropertyChanged(nameof(UseHtmlRendering));
         OnPropertyChanged(nameof(IsDark));
         OnPropertyChanged(nameof(ShowReloadBodyButton));
+        OnPropertyChanged(nameof(ShowBodyContent));
     }
 
     partial void OnIsLoadingChanged(bool value)
@@ -344,6 +375,7 @@ public sealed partial class MailReaderViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowBodyView));
         OnPropertyChanged(nameof(ShowReloadBodyButton));
+        OnPropertyChanged(nameof(ShowBodyContent));
     }
 
     partial void OnTagsChanged(IReadOnlyList<MailTag> value) => OnPropertyChanged(nameof(HasTags));
@@ -441,6 +473,9 @@ public sealed partial class MailReaderViewModel : ObservableObject
     {
         // 自增会话号：关闭瞬间仍在进行的加载回来后会被丢弃，不会再把正文写回来
         _session++;
+
+        // 关窗即清空摘要卡片并取消推理
+        Summary.Reset();
 
         // 关窗即取消还没下完的正文，不必等下完
         var pending = Interlocked.Exchange(ref _loadCts, null);

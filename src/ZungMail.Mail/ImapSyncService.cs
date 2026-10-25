@@ -1040,6 +1040,24 @@ public sealed class ImapSyncService : IMailSyncService
         var body = await MimeMapper.ExtractBodyAsync(message, _paths, detail, ct, saveAttachments).ConfigureAwait(false);
         await _messages.SaveBodyAsync(detail.Id, body.Html, body.Text, body.Attachments, ct).ConfigureAwait(false);
 
+        // 退信：失败收件人 / 状态码只在 delivery-status 段里，正文已下载就顺带解析（不额外发请求）；
+        // 顺带兜住「BODYSTRUCTURE 不可用、发件人主题也没命中」的 DSN（例如内部转发过的退信）。
+        var bounce = BounceDsnParser.Parse(message);
+        if (bounce is not null)
+        {
+            detail.IsBounce = true;
+            detail.BounceRecipient = bounce.Recipient;
+            detail.BounceStatus = bounce.Status;
+            detail.BounceDetail = bounce.Detail;
+        }
+
+        if (detail.IsBounce && detail.Id > 0)
+        {
+            await _messages
+                .UpdateBounceAsync(detail.Id, true, detail.BounceRecipient, detail.BounceStatus, detail.BounceDetail, ct)
+                .ConfigureAwait(false);
+        }
+
         detail.BodyHtml = body.Html;
         detail.BodyText = body.Text;
         detail.Attachments = body.Attachments;

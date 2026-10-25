@@ -137,7 +137,11 @@ WHERE f.kind IN (4, 5);
         };
     }
 
-    private static StorageAlertLevel Evaluate(AppSettings settings, double usage, out string text)
+    /// <summary>
+    /// 纯策略判定：按设置里的分级阈值把「占用百分比」映射成告警级别。
+    /// 抽成 public 静态方法是为了让测试直接验证边界，不必依赖真实磁盘占用（SQLite 页分配会抖动）。
+    /// </summary>
+    public static StorageAlertLevel Evaluate(AppSettings settings, double usage, out string text)
     {
         text = string.Empty;
         if (!settings.StorageAlertsEnabled) return StorageAlertLevel.Normal;

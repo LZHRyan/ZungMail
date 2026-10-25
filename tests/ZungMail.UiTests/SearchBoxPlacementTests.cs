@@ -15,12 +15,12 @@ public sealed class SearchBoxPlacementTests
     }
 
     [Fact]
-    public void 搜索框在工具栏行内_标题栏收窄到38()
+    public void 搜索框在工具栏行内_标题栏收窄到32()
     {
         var xaml = ReadMainWindow();
 
         Assert.Contains("搜索框：从标题栏移到工具栏里", xaml);
-        Assert.Contains("Height=\"38\"", xaml);
+        Assert.Contains("Height=\"32\"", xaml);
         Assert.Contains("<RowDefinition Height=\"Auto\" />", xaml);
 
         // SearchBox 只声明一次，且位于工具栏注释之后（标题栏只保留弹层宿主）

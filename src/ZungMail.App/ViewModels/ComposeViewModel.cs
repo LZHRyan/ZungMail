@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -632,7 +633,35 @@ public sealed partial class ComposeViewModel : ObservableObject
 
     // ---------------- 收件人补全 ----------------
 
-    partial void OnToChanged(string value) => _ = SuggestAsync(value);
+    /// <summary>收件人补全的防抖间隔：连打一串字符只查最后一次。</summary>
+    private const int SuggestDebounceMs = 120;
+
+    private CancellationTokenSource? _suggestDebounce;
+
+    partial void OnToChanged(string value) => QueueSuggest(value);
+
+    /// <summary>输入停顿 120ms 再查库；新输入取消上一次未完成查询（不再逐键查 2300 联系人）。</summary>
+    private void QueueSuggest(string value)
+    {
+        _suggestDebounce?.Cancel();
+        _suggestDebounce?.Dispose();
+        var cts = new CancellationTokenSource();
+        _suggestDebounce = cts;
+
+        FireAndForget.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(SuggestDebounceMs, cts.Token).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            await SuggestAsync(value).ConfigureAwait(true);
+        }, "收件人补全");
+    }
 
     private async Task SuggestAsync(string value)
     {
@@ -647,7 +676,8 @@ public sealed partial class ComposeViewModel : ObservableObject
 
         try
         {
-            var matches = await _contacts.SuggestAsync(prefix, 6);
+            // SQLite 的「异步」底层同步执行：查询放线程池，结果回 UI
+            var matches = await Task.Run(() => _contacts.SuggestAsync(prefix, 6)).ConfigureAwait(true);
             if (version != _suggestVersion) return;
 
             Suggestions.Clear();

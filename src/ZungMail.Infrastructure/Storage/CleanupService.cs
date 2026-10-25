@@ -44,11 +44,45 @@ public sealed class CleanupService : ICleanupService
 
     // ---------------- 预览 ----------------
 
-    public async Task<CleanupPreview> PreviewAsync(CleanupFilter filter, int take = 200, CancellationToken ct = default)
+    /// <summary>预览汇总：匹配数量与字节统计（全表聚合，只在筛选条件变化时算一次）。</summary>
+    private readonly record struct PreviewSummary(int Total, long TotalBytes, long AttachmentBytes, long Reclaimable);
+
+    public async Task<CleanupPreview> PreviewAsync(
+        CleanupFilter filter, int take = 200, int skip = 0, CancellationToken ct = default)
     {
         var (joins, where, prms) = BuildWhere(filter, excludeJobId: 0);
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
 
+        var summary = await LoadSummaryAsync(connection, joins, where, prms, filter.ClearBodyOnly, ct)
+            .ConfigureAwait(false);
+
+        var items = summary.Total > 0
+            ? await LoadItemsAsync(connection, joins, where, prms, take, skip, ct).ConfigureAwait(false)
+            : Array.Empty<CleanupPreviewItem>();
+
+        return new CleanupPreview
+        {
+            Items = items,
+            TotalCount = summary.Total,
+            TotalBytes = summary.TotalBytes,
+            AttachmentBytes = summary.AttachmentBytes,
+            ReclaimableBytes = summary.Reclaimable
+        };
+    }
+
+    public async Task<IReadOnlyList<CleanupPreviewItem>> PreviewItemsAsync(
+        CleanupFilter filter, int take = 50, int skip = 0, CancellationToken ct = default)
+    {
+        // 翻页只取这一页，不重跑 COUNT/SUM：汇总由调用方按筛选条件缓存
+        var (joins, where, prms) = BuildWhere(filter, excludeJobId: 0);
+        await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+        return await LoadItemsAsync(connection, joins, where, prms, take, skip, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<PreviewSummary> LoadSummaryAsync(
+        SqliteConnection connection, string joins, string where,
+        List<(string Name, object? Value)> prms, bool clearBodyOnly, CancellationToken ct)
+    {
         int total;
         long totalBytes;
         long attachmentBytes;
@@ -70,11 +104,34 @@ WHERE {where};
             attachmentBytes = reader.GetInt64(2);
         }
 
-        var items = new List<CleanupPreviewItem>();
-        if (total > 0)
+        // 预告口径与实际清理一致：整封删除＝邮件 + 附件；仅清正文＝正文长度 + 附件大小
+        var reclaimable = totalBytes + attachmentBytes;
+        if (clearBodyOnly && total > 0)
         {
             await using var command = connection.CreateCommand();
             command.CommandText = $"""
+SELECT COALESCE(SUM(CASE WHEN m.body_state = 1
+                         THEN length(COALESCE(m.body_html, '')) + length(COALESCE(m.body_text, ''))
+                         ELSE 0 END), 0)
+     + COALESCE(SUM(COALESCE((SELECT SUM(a.size) FROM attachments a
+                              WHERE a.message_id = m.id), 0)), 0)
+FROM messages m {joins}
+WHERE {where};
+""";
+            Apply(command, prms);
+            reclaimable = Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false) ?? 0L);
+        }
+
+        return new PreviewSummary(total, totalBytes, attachmentBytes, reclaimable);
+    }
+
+    private static async Task<IReadOnlyList<CleanupPreviewItem>> LoadItemsAsync(
+        SqliteConnection connection, string joins, string where,
+        List<(string Name, object? Value)> prms, int take, int skip, CancellationToken ct)
+    {
+        var items = new List<CleanupPreviewItem>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
 SELECT m.id, m.account_id, m.folder_id, COALESCE(f.display_name, f.full_name),
        m.subject, m.from_email, m.date_utc, m.size, m.flags,
        COALESCE((SELECT SUM(a.size) FROM attachments a
@@ -82,39 +139,55 @@ SELECT m.id, m.account_id, m.folder_id, COALESCE(f.display_name, f.full_name),
 FROM messages m {joins}
 WHERE {where}
 ORDER BY m.date_utc DESC, m.id DESC
-LIMIT @take;
+LIMIT @take OFFSET @skip;
 """;
-            Apply(command, prms);
-            command.Parameters.AddWithValue("@take", Math.Clamp(take, 1, 2000));
-            await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
-            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        Apply(command, prms);
+        command.Parameters.AddWithValue("@take", Math.Clamp(take, 1, 2000));
+        command.Parameters.AddWithValue("@skip", Math.Max(0, skip));
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            items.Add(new CleanupPreviewItem
             {
-                items.Add(new CleanupPreviewItem
-                {
-                    Id = reader.GetInt64(0),
-                    AccountId = reader.GetInt64(1),
-                    FolderId = reader.GetInt64(2),
-                    FolderName = SqlConvert.Str(reader, 3),
-                    Subject = SqlConvert.Str(reader, 4),
-                    FromEmail = SqlConvert.Str(reader, 5),
-                    DateUtc = SqlConvert.ParseDate(SqlConvert.StrOrNull(reader, 6)),
-                    Size = reader.GetInt64(7),
-                    Flags = (MessageFlags)reader.GetInt32(8),
-                    AttachmentBytes = reader.GetInt64(9)
-                });
-            }
+                Id = reader.GetInt64(0),
+                AccountId = reader.GetInt64(1),
+                FolderId = reader.GetInt64(2),
+                FolderName = SqlConvert.Str(reader, 3),
+                Subject = SqlConvert.Str(reader, 4),
+                FromEmail = SqlConvert.Str(reader, 5),
+                DateUtc = SqlConvert.ParseDate(SqlConvert.StrOrNull(reader, 6)),
+                Size = reader.GetInt64(7),
+                Flags = (MessageFlags)reader.GetInt32(8),
+                AttachmentBytes = reader.GetInt64(9)
+            });
         }
 
-        return new CleanupPreview
-        {
-            Items = items,
-            TotalCount = total,
-            TotalBytes = totalBytes,
-            AttachmentBytes = attachmentBytes
-        };
+        return items;
     }
 
     // ---------------- 执行 ----------------
+
+    public async Task<IReadOnlyList<long>> GetMatchingIdsAsync(
+        CleanupFilter filter, CancellationToken ct = default)
+    {
+        var (joins, where, prms) = BuildWhere(filter, excludeJobId: 0);
+        var ids = new List<long>();
+        await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        // 只取 id：全选 / 反选在二十万级也只是一串 long，不加载邮件正文
+        command.CommandText = $"""
+SELECT m.id FROM messages m {joins}
+WHERE {where}
+ORDER BY m.date_utc DESC, m.id DESC;
+""";
+        Apply(command, prms);
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            ids.Add(reader.GetInt64(0));
+        }
+        return ids;
+    }
 
     public async Task<CleanupJob> ExecuteAsync(
         CleanupFilter filter,
@@ -128,6 +201,7 @@ LIMIT @take;
             Mode = mode,
             Status = CleanupStatus.Running,
             StartedUtc = DateTimeOffset.UtcNow,
+            IsBodyOnly = filter.ClearBodyOnly,
             FilterJson = JsonSerializer.Serialize(new JobPayload
             {
                 Filter = filter,
@@ -175,6 +249,13 @@ LIMIT @take;
         job.FinishedUtc = null;
         job.Note = "";
 
+        // 仅清正文没有隔离区快照可跳过，恢复时从头重扫一遍（已清空的是空操作），计数归零避免翻倍
+        if (job.IsBodyOnly)
+        {
+            job.ProcessedCount = 0;
+            job.TotalBytes = 0;
+        }
+
         return await RunAsync(job, payload.Filter, payload.SelectedIds, excludeJobId: job.Id, progress, ct)
             .ConfigureAwait(false);
     }
@@ -199,7 +280,7 @@ LIMIT @take;
                 foreach (var chunk in selectedIds.Chunk(BatchSize))
                 {
                     ct.ThrowIfCancellationRequested();
-                    var (count, size) = await ProcessBatchAsync(connection, job, chunk, ct).ConfigureAwait(false);
+                    var (count, size) = await ProcessBatchAsync(connection, job, filter, chunk, ct).ConfigureAwait(false);
                     processed += count;
                     bytes += size;
                     await UpdateProgressAsync(connection, job.Id, processed, bytes, ct).ConfigureAwait(false);
@@ -220,7 +301,7 @@ LIMIT @take;
                     var ids = await SelectIdBatchAsync(connection, filter, lastId, excludeJobId, ct).ConfigureAwait(false);
                     if (ids.Count == 0) break;
 
-                    var (count, size) = await ProcessBatchAsync(connection, job, ids, ct).ConfigureAwait(false);
+                    var (count, size) = await ProcessBatchAsync(connection, job, filter, ids, ct).ConfigureAwait(false);
                     processed += count;
                     bytes += size;
                     lastId = ids[^1];
@@ -240,7 +321,7 @@ LIMIT @take;
         catch (OperationCanceledException)
         {
             job.Status = CleanupStatus.Cancelled;
-            job.Note = "用户中断，已处理部分可撤销或恢复";
+            job.Note = job.IsBodyOnly ? "用户中断，可稍后恢复" : "用户中断，已处理部分可撤销或恢复";
         }
         catch (Exception ex)
         {
@@ -282,8 +363,15 @@ LIMIT {BatchSize};
     }
 
     private async Task<(int Count, long Bytes)> ProcessBatchAsync(
-        SqliteConnection connection, CleanupJob job, IReadOnlyList<long> ids, CancellationToken ct)
+        SqliteConnection connection,
+        CleanupJob job,
+        CleanupFilter filter,
+        IReadOnlyList<long> ids,
+        CancellationToken ct)
     {
+        // 仅清正文与附件：邮件本身留着，只清缓存，不写隔离区快照（因此不可撤销）
+        if (filter.ClearBodyOnly) return await ClearBodyBatchAsync(connection, ids, ct).ConfigureAwait(false);
+
         var details = await LoadDetailsAsync(connection, ids, ct).ConfigureAwait(false);
         if (details.Count == 0) return (0, 0);
 
@@ -344,6 +432,88 @@ VALUES(@jobId, @messageId, @accountId, @folderId, @folderName, @subject,
         }
 
         return (details.Count, bytes);
+    }
+
+    /// <summary>
+    /// 仅清正文与附件：清空已下载正文与全文索引、删除附件记录（含内嵌），
+    /// 邮件头 / 标志 / 文件夹保持不动；事务提交后再删 <c>eml</c> 下的附件目录。
+    /// 释放字节＝已下载正文长度 + 附件大小，与预览口径一致。
+    /// </summary>
+    private async Task<(int Count, long Bytes)> ClearBodyBatchAsync(
+        SqliteConnection connection, IReadOnlyList<long> ids, CancellationToken ct)
+    {
+        var targets = new List<(long AccountId, long MessageId)>(ids.Count);
+        long bytes = 0;
+
+        await using (var tx = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false))
+        {
+            await using (var select = connection.CreateCommand())
+            {
+                select.Transaction = tx;
+                select.CommandText = $"""
+SELECT m.id, m.account_id,
+       CASE WHEN m.body_state = 1
+            THEN length(COALESCE(m.body_html, '')) + length(COALESCE(m.body_text, ''))
+            ELSE 0 END,
+       COALESCE((SELECT SUM(a.size) FROM attachments a WHERE a.message_id = m.id), 0)
+FROM messages m
+WHERE m.id IN ({Placeholders(ids.Count)});
+""";
+                AddIdParameters(select, ids);
+                await using var reader = await select.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    targets.Add((reader.GetInt64(1), reader.GetInt64(0)));
+                    bytes += reader.GetInt64(2) + reader.GetInt64(3);
+                }
+            }
+
+            await using (var clear = connection.CreateCommand())
+            {
+                clear.Transaction = tx;
+                clear.CommandText =
+                    $"UPDATE messages SET body_html = NULL, body_text = NULL, body_state = 0, fts_body = '' " +
+                    $"WHERE id IN ({Placeholders(ids.Count)});";
+                AddIdParameters(clear, ids);
+                await clear.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+
+            await using (var attachments = connection.CreateCommand())
+            {
+                attachments.Transaction = tx;
+                attachments.CommandText =
+                    $"DELETE FROM attachments WHERE message_id IN ({Placeholders(ids.Count)});";
+                AddIdParameters(attachments, ids);
+                await attachments.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+        }
+
+        // 库已提交后再删文件：即使文件被占用，正文缓存也已经清掉，下次还能再清
+        foreach (var (accountId, messageId) in targets)
+        {
+            DeleteMessageFiles(accountId, messageId);
+        }
+
+        return (targets.Count, bytes);
+    }
+
+    /// <summary>删除一封邮件在 <c>eml\{账户}\{邮件id}</c> 下的附件 / 内嵌图片文件。</summary>
+    private void DeleteMessageFiles(long accountId, long messageId)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                _paths.EmlDirectory,
+                accountId.ToString(CultureInfo.InvariantCulture),
+                messageId.ToString(CultureInfo.InvariantCulture));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "删除邮件 {MessageId} 的附件文件失败", messageId);
+        }
     }
 
     /// <summary>一次取出一批邮件的完整快照（含附件），用于写入审计与撤销恢复。</summary>
@@ -519,7 +689,8 @@ WHERE id = @id;
     public async Task<long> PurgeAsync(long jobId, CancellationToken ct = default)
     {
         var job = await GetJobAsync(jobId, ct).ConfigureAwait(false);
-        if (job is null || job.Status == CleanupStatus.Purged) return 0;
+        // 仅清正文的任务没有隔离区数据，直接返回，避免把状态改成「已彻底删除」
+        if (job is null || job.IsBodyOnly || job.Status == CleanupStatus.Purged) return 0;
 
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
         long lastItemId = 0;
@@ -593,7 +764,7 @@ WHERE id = @id;
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = """
-SELECT id FROM cleanup_jobs
+SELECT id, filter_json FROM cleanup_jobs
 WHERE status IN (@completed, @cancelled) AND started_utc < @cutoff
 ORDER BY id;
 """;
@@ -603,6 +774,8 @@ ORDER BY id;
             await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
+                // 仅清正文的任务没有隔离区数据可彻底删除，跳过（否则会把状态错误改成「已彻底删除」）
+                if (IsBodyOnlyPayload(reader.GetString(1))) continue;
                 ids.Add(reader.GetInt64(0));
             }
         }
@@ -652,22 +825,40 @@ FROM cleanup_jobs WHERE id = @id;
         return await reader.ReadAsync(ct).ConfigureAwait(false) ? MapJob(reader) : null;
     }
 
-    private static CleanupJob MapJob(SqliteDataReader reader) => new()
+    private static CleanupJob MapJob(SqliteDataReader reader)
     {
-        Id = reader.GetInt64(0),
-        Mode = (CleanupMode)reader.GetInt32(1),
-        Status = (CleanupStatus)reader.GetInt32(2),
-        FilterJson = reader.GetString(3),
-        TotalCount = reader.GetInt32(4),
-        ProcessedCount = reader.GetInt32(5),
-        TotalBytes = reader.GetInt64(6),
-        FreedBytes = reader.GetInt64(7),
-        StartedUtc = DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture),
-        FinishedUtc = reader.IsDBNull(9)
-            ? null
-            : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture),
-        Note = reader.GetString(10)
-    };
+        var filterJson = reader.GetString(3);
+        return new CleanupJob
+        {
+            Id = reader.GetInt64(0),
+            Mode = (CleanupMode)reader.GetInt32(1),
+            Status = (CleanupStatus)reader.GetInt32(2),
+            FilterJson = filterJson,
+            IsBodyOnly = IsBodyOnlyPayload(filterJson),
+            TotalCount = reader.GetInt32(4),
+            ProcessedCount = reader.GetInt32(5),
+            TotalBytes = reader.GetInt64(6),
+            FreedBytes = reader.GetInt64(7),
+            StartedUtc = DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture),
+            FinishedUtc = reader.IsDBNull(9)
+                ? null
+                : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture),
+            Note = reader.GetString(10)
+        };
+    }
+
+    /// <summary>从审计表里的任务参数判断是否为「仅清正文与附件」任务；旧记录或坏 JSON 一律按整封删除处理。</summary>
+    private static bool IsBodyOnlyPayload(string filterJson)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<JobPayload>(filterJson, JsonOptions)?.Filter?.ClearBodyOnly == true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     // ---------------- 任务写入 ----------------
 

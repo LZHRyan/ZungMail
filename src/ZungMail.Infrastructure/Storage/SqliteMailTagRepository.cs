@@ -132,6 +132,45 @@ ON CONFLICT(email_id, tag_id) DO NOTHING;
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    public Task AddToMessagesAsync(long tagId, IReadOnlyList<long> emailIds, CancellationToken ct = default)
+    {
+        // 一条连接 + 一个事务包住 N 封：标签窗口勾多个标签时，连接数从 N×M 降到 M
+        return ExecuteBatchAsync(
+            "INSERT INTO message_tags(email_id, tag_id, created_utc) VALUES(@email, @tag, @utc) " +
+            "ON CONFLICT(email_id, tag_id) DO NOTHING;",
+            tagId, emailIds, ct);
+    }
+
+    public Task RemoveFromMessagesAsync(long tagId, IReadOnlyList<long> emailIds, CancellationToken ct = default)
+        => ExecuteBatchAsync(
+            "DELETE FROM message_tags WHERE email_id = @email AND tag_id = @tag;",
+            tagId, emailIds, ct);
+
+    private async Task ExecuteBatchAsync(
+        string sql, long tagId, IReadOnlyList<long> emailIds, CancellationToken ct)
+    {
+        if (emailIds.Count == 0) return;
+
+        await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+        await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("@tag", tagId);
+        var emailParam = command.Parameters.Add("@email", SqliteType.Integer);
+        var utcParam = command.Parameters.Add("@utc", SqliteType.Text);
+        utcParam.Value = SqlConvert.ToDb(DateTimeOffset.UtcNow)!;
+
+        foreach (var emailId in emailIds)
+        {
+            ct.ThrowIfCancellationRequested();
+            emailParam.Value = emailId;
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        await tx.CommitAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<long>> GetMessageIdsAsync(long tagId, CancellationToken ct = default)
     {
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);

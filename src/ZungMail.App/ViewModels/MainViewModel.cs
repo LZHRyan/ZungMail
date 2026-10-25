@@ -57,6 +57,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>查看邮件源码窗口（与阅读窗口共用同一个单实例）。</summary>
     private readonly IMailSourceWindowService _mailSourceWindows;
 
+    /// <summary>「AI 总结」卡片状态（主窗口右栏自己一份）。</summary>
+    public MailSummaryViewModel Summary { get; }
+
     /// <summary>联系人头像缓存（Gravatar 懒加载的结果）：邮件头与侧栏账户按地址取画刷。</summary>
     private readonly AvatarStore _avatars;
     private readonly ILogger<MainViewModel> _logger;
@@ -120,6 +123,7 @@ public sealed partial class MainViewModel : ObservableObject
         IDialogService dialogs,
         AttachmentActionService attachments,
         IMailSourceWindowService mailSourceWindows,
+        MailSummaryViewModel summary,
         IAppPaths paths,
         AvatarStore avatarStore,
         UpdateCoordinator updateCoordinator,
@@ -157,6 +161,7 @@ public sealed partial class MainViewModel : ObservableObject
         _dialogs = dialogs;
         _attachments = attachments;
         _mailSourceWindows = mailSourceWindows;
+        Summary = summary;
         _avatars = avatarStore;
         _emlDirectory = paths.EmlDirectory;
         _logger = logger;
@@ -342,7 +347,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSelectedCorrespondenceChanged(CorrespondenceItem? value)
     {
         if (value is null) return;
-        _ = ShowCorrespondenceAsync(value);
+        FireAndForget.Run(() => ShowCorrespondenceAsync(value), "加载往来邮件");
         SelectedCorrespondence = null;
     }
 
@@ -916,10 +921,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>正文区域是否显示正文：下载中先让位给加载占位，避免一大片空白。</summary>
     public bool ShowBodyView => !IsBodyLoading;
 
+    /// <summary>
+    /// 正文控件（含 WebView2）是否可见。
+    /// WebView2 是独立 HWND，永远盖在同一层 Grid 里的 WPF 元素之上——只要它还在渲染，
+    /// 叠在上面的「重新获取正文」卡片就看不见。所以需要卡片时把正文控件整块收起来。
+    /// </summary>
+    public bool ShowBodyContent => ShowBodyView && !ShowReloadBodyButton;
+
     partial void OnIsBodyLoadingChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowBodyView));
         OnPropertyChanged(nameof(ShowReloadBodyButton));
+        OnPropertyChanged(nameof(ShowBodyContent));
     }
 
     /// <summary>
@@ -1013,6 +1026,9 @@ public sealed partial class MainViewModel : ObservableObject
                 EmlDirectory = _emlDirectory
             };
 
+            // 探针：这是绑定 getter，每次求值都整篇重建 HTML
+            using var scope = UiThreadProbe.Measure("正文组装");
+
             // 与纯文本回退保持一致的占位文案，避免空白页
             if (string.IsNullOrWhiteSpace(Detail.BodyHtml) && string.IsNullOrWhiteSpace(Detail.BodyText))
             {
@@ -1103,12 +1119,27 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(StorageReclaimableText));
     }
 
-    /// <summary>刷新存储快照。聚合 SQL + 文件元数据，百万级邮件下也是毫秒级。</summary>
-    public async Task RefreshStorageAsync()
+    /// <summary>上一次存储快照与其时间：3 分钟定时器与清理窗口关闭后的刷新共用，避免重复扫目录。</summary>
+    private StorageSnapshot? _storageCache;
+    private DateTime _storageCacheAtUtc;
+
+    /// <summary>刷新存储快照。聚合 SQL + 目录扫描必须在线程池，界面线程只做赋值。</summary>
+    public async Task RefreshStorageAsync(bool force = false)
     {
+        if (!force
+            && _storageCache is { } cached
+            && DateTime.UtcNow - _storageCacheAtUtc < TimeSpan.FromMinutes(1))
+        {
+            Storage = cached;
+            return;
+        }
+
         try
         {
-            Storage = await _storageMonitor.GetSnapshotAsync();
+            var snapshot = await Task.Run(() => _storageMonitor.GetSnapshotAsync()).ConfigureAwait(true);
+            _storageCache = snapshot;
+            _storageCacheAtUtc = DateTime.UtcNow;
+            Storage = snapshot;
         }
         catch (Exception ex)
         {
@@ -1131,7 +1162,7 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task OpenCleanupAsync()
     {
         _dialogs.ShowCleanup();
-        await RefreshStorageAsync();
+        await RefreshStorageAsync(force: true);
     }
 
     /// <summary>从账户节点右键进入清理：作用域预置为该账户。</summary>
@@ -1141,7 +1172,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (node is null) return;
 
         _dialogs.ShowCleanup(new CleanupScope(AccountId: node.Id, FolderId: null, Label: $"账户「{node.Title}」"));
-        await RefreshStorageAsync();
+        await RefreshStorageAsync(force: true);
     }
 
     /// <summary>从文件夹节点右键进入清理：作用域预置为该文件夹。</summary>
@@ -1151,7 +1182,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (folder is null) return;
 
         _dialogs.ShowCleanup(new CleanupScope(AccountId: folder.AccountId, FolderId: folder.Model.Id, Label: $"文件夹「{folder.Title}」"));
-        await RefreshStorageAsync();
+        await RefreshStorageAsync(force: true);
     }
 
     // ---------------- 初始化 ----------------
@@ -1217,7 +1248,7 @@ public sealed partial class MainViewModel : ObservableObject
             _logger.LogInformation("启动计时（界面初始化）：{Stages}", string.Join(" · ", stages));
 
             // 后台补扫业务单号（首次升级需要处理历史邮件），不阻塞首屏
-            _ = WarmReferenceIndexAsync();
+            FireAndForget.Run(WarmReferenceIndexAsync, "预建业务单号索引");
 
             // 设置文件损坏时已回退默认值并备份原文件，这里给出轻量提示（含备份文件名）
             if (_settings.LoadWarning is { Length: > 0 } warning) StatusText = warning;
@@ -1796,14 +1827,14 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (_suspendReload) return;
         CurrentPage = 1;
-        _ = ReloadMessagesAsync();
+        FireAndForget.Run(() => ReloadMessagesAsync(), "刷新邮件列表");
     }
 
     partial void OnConversationModeChanged(bool value)
     {
         if (_suspendReload) return;
         CurrentPage = 1;
-        _ = ReloadMessagesAsync();
+        FireAndForget.Run(() => ReloadMessagesAsync(), "刷新邮件列表");
     }
 
     partial void OnSearchTextChanged(string value)
@@ -1824,7 +1855,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (_suppressSearchReload || !IsSearchResults) return;
 
         CurrentPage = 1;
-        _ = ReloadMessagesAsync();
+        FireAndForget.Run(() => ReloadMessagesAsync(), "刷新邮件列表");
     }
 
     // ---------------- 货代行业功能开关（设置页「货代」分区） ----------------
@@ -1903,7 +1934,19 @@ public sealed partial class MainViewModel : ObservableObject
         var enabled = _settings.Current.MarkStrangerSenders;
         foreach (var row in Messages) row.StrangerBadgeEnabled = enabled;
         OnPropertyChanged(nameof(ShowDetailStranger));
+
+        var bounceEnabled = _settings.Current.MarkBounceMails;
+        foreach (var row in Messages) row.BounceBadgeEnabled = bounceEnabled;
+        OnPropertyChanged(nameof(ShowDetailBounce));
     }
+
+    // ---------------- 退信 ----------------
+
+    /// <summary>阅读区是否显示退信提示（开关打开 + 当前这封确实是投递失败退回的邮件）。</summary>
+    public bool ShowDetailBounce => _settings.Current.MarkBounceMails && Detail is { IsBounce: true };
+
+    /// <summary>退信提示条第二行：失败收件人 / 状态码 / 诊断，没有细节时引导看正文。</summary>
+    public string DetailBounceLine => Detail?.BounceDetailLine ?? "";
 
     /// <summary>
     /// 把陌生发件人加入通讯录：只影响以后的来信——按规格，当前这封邮件的陌生标识保持不变。
@@ -1983,6 +2026,9 @@ public sealed partial class MainViewModel : ObservableObject
         // 远程图片放行只对当前这封邮件生效
         _loadRemoteImages = false;
 
+        // 换邮件就收起上一封的摘要，避免张冠李戴
+        Summary.Reset();
+
         RefreshDetailPhishing();
         OnPropertyChanged(nameof(HasDetail));
         OnPropertyChanged(nameof(DetailAvatarBrush));
@@ -2005,8 +2051,11 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowDetailPlaceholder));
         OnPropertyChanged(nameof(ShowDetailIndustryType));
         OnPropertyChanged(nameof(ShowDetailStranger));
+        OnPropertyChanged(nameof(ShowDetailBounce));
+        OnPropertyChanged(nameof(DetailBounceLine));
         OnPropertyChanged(nameof(CanReplyOrForward));
         OnPropertyChanged(nameof(ShowReloadBodyButton));
+        OnPropertyChanged(nameof(ShowBodyContent));
         StrangerJoined = false;
     }
 
@@ -2023,7 +2072,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ReadToggleText));
         OnPropertyChanged(nameof(IsSelectedStarred));
         OnPropertyChanged(nameof(IsSelectedUnread));
-        _ = LoadDetailAsync(value);
+        FireAndForget.Run(() => LoadDetailAsync(value), "加载邮件详情");
     }
 
     private MessageQuery BuildQuery(int skip)
@@ -2095,19 +2144,28 @@ public sealed partial class MainViewModel : ObservableObject
             var rows = new List<MailRow>();
             int total;
 
+            // SQLite 的「异步」底层同步执行：查询放到线程池，界面线程只等结果（行对象仍在 UI 线程构建）
+            var queryWatch = Stopwatch.StartNew();
+
             if (ConversationMode)
             {
-                var page = await _messages.QueryThreadsAsync(query);
+                var page = await Task.Run(() => _messages.QueryThreadsAsync(query)).ConfigureAwait(true);
                 rows.AddRange(page.Items.Select(g => new MailRow(g.Representative, g.Count, _avatars)));
                 total = page.TotalCount;
                 HasMore = page.HasMore;
             }
             else
             {
-                var page = await _messages.QueryAsync(query);
+                var page = await Task.Run(() => _messages.QueryAsync(query)).ConfigureAwait(true);
                 rows.AddRange(page.Items.Select(s => new MailRow(s, avatars: _avatars)));
                 total = page.TotalCount;
                 HasMore = page.HasMore;
+            }
+
+            if (queryWatch.ElapsedMilliseconds >= 150)
+            {
+                _logger.LogInformation("列表查询耗时 {Ms}ms（{Count} 行/共 {Total} 封）",
+                    queryWatch.ElapsedMilliseconds, rows.Count, total);
             }
 
             if (version != _loadVersion) return; // 已有更新的加载请求，丢弃本次结果
@@ -2134,7 +2192,7 @@ public sealed partial class MainViewModel : ObservableObject
 
             await LetUiRenderAsync();
             StartupTrace.Mark("列表上屏");
-            _ = LoadRowBadgesAsync(rows, version);
+            FireAndForget.Run(() => LoadRowBadgesAsync(rows, version), "补齐行徽标");
         }
         catch (Exception ex)
         {
@@ -2163,6 +2221,10 @@ public sealed partial class MainViewModel : ObservableObject
         // 陌生发件人角标同样跟随设置开关（数据在库里，重新开启后立刻恢复）
         var showStranger = _settings.Current.MarkStrangerSenders;
         foreach (var row in rows) row.StrangerBadgeEnabled = showStranger;
+
+        // 退信角标同理
+        var showBounce = _settings.Current.MarkBounceMails;
+        foreach (var row in rows) row.BounceBadgeEnabled = showBounce;
 
         // 仿冒域名按当前开关与容差算一遍（纯内存判定，历史邮件同样适用）
         foreach (var row in rows) row.Phishing = EvaluatePhishing(row.Model.FromEmail);
@@ -2624,6 +2686,13 @@ public sealed partial class MainViewModel : ObservableObject
             await ReloadSidebarTagsAsync();
         }
     }
+
+    /// <summary>
+    /// 对当前邮件生成 AI 摘要（本机小模型；模型不可用时自动退回规则抽取）。
+    /// 只读操作，不标记已读、不写库。
+    /// </summary>
+    [RelayCommand]
+    private async Task SummarizeAsync() => await Summary.ShowAsync(Detail).ConfigureAwait(true);
 
     /// <summary>
     /// 查看当前选中邮件的源码：优先服务器原始 MIME，取不到回退本地重建。
@@ -3716,7 +3785,7 @@ public sealed partial class MainViewModel : ObservableObject
             await RefreshPendingStateAsync();
 
             // 新邮件入库后补扫业务单号并刷新侧栏，不阻塞同步结果展示
-            _ = WarmReferenceIndexAsync();
+            FireAndForget.Run(WarmReferenceIndexAsync, "预建业务单号索引");
         }
         catch (Exception ex)
         {
@@ -3773,7 +3842,7 @@ public sealed partial class MainViewModel : ObservableObject
             await RefreshPendingStateAsync();
 
             // 新邮件入库后补扫业务单号并刷新侧栏，不阻塞状态栏结果
-            _ = WarmReferenceIndexAsync();
+            FireAndForget.Run(WarmReferenceIndexAsync, "预建业务单号索引");
         }
         catch (Exception ex)
         {
@@ -3938,7 +4007,7 @@ public sealed partial class MainViewModel : ObservableObject
                     _suspendReload = false;
                     ListTitle = quick.Title;
                 }
-                _ = ReloadMessagesAsync();
+                FireAndForget.Run(() => ReloadMessagesAsync(), "刷新邮件列表");
             }
 
             node.Update(account);
@@ -3984,9 +4053,18 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task RefreshLocalTotalAsync()
     {
-        LocalTotal = await _messages.CountAsync();
-        LocalUnread = await _messages.CountUnreadAsync();
-        OnPropertyChanged(nameof(AccountSummary));
+        try
+        {
+            // 一次按文件夹分组的聚合顶原来两次全表 COUNT，且放到线程池：每封新邮件同步后都会走这里
+            var counts = await Task.Run(() => _messages.GetFolderCountsAsync()).ConfigureAwait(true);
+            LocalTotal = counts.Values.Sum(pair => pair.Total);
+            LocalUnread = counts.Values.Sum(pair => pair.Unread);
+            OnPropertyChanged(nameof(AccountSummary));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "刷新本地邮件统计失败");
+        }
     }
 
     /// <summary>刷新状态栏的待同步操作数量。</summary>

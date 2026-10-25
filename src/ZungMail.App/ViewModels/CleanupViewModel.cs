@@ -35,13 +35,57 @@ public sealed partial class CleanupItemRow : ObservableObject
 }
 
 /// <summary>
+/// 清理列表的勾选集合：跨页保存「哪些邮件被勾了」，供单页全选 / 反选与整批全选 / 反选使用。
+/// 只存 id，二十万级也只是一串 long。
+/// </summary>
+public sealed class CleanupSelection
+{
+    private readonly HashSet<long> _ids = new();
+
+    public int Count => _ids.Count;
+
+    public bool Contains(long id) => _ids.Contains(id);
+
+    public void Set(long id, bool selected)
+    {
+        if (selected) _ids.Add(id);
+        else _ids.Remove(id);
+    }
+
+    /// <summary>整体勾选一批（全选）：以本批为准，清掉上一轮筛选留下的 id，避免误删范围外的邮件。</summary>
+    public void SelectAll(IEnumerable<long> ids)
+    {
+        _ids.Clear();
+        _ids.UnionWith(ids);
+    }
+
+    /// <summary>反选整批：原来勾上的取消，原来没勾的勾上（不在本批里的 id 一律取消，避免残留）。</summary>
+    public void InvertAll(IEnumerable<long> ids)
+    {
+        var inverted = new HashSet<long>();
+        foreach (var id in ids)
+        {
+            if (!_ids.Contains(id)) inverted.Add(id);
+        }
+
+        _ids.Clear();
+        _ids.UnionWith(inverted);
+    }
+
+    public void Clear() => _ids.Clear();
+
+    /// <summary>按当前预览顺序导出，保证清理顺序与列表一致。</summary>
+    public List<long> Snapshot() => _ids.ToList();
+}
+
+/// <summary>
 /// 历史邮件清理：多维度筛选预览、一键 / 勾选 / 自动清理、进度、中断恢复、
 /// 隔离期撤销与彻底删除。所有操作均落在审计表，可追溯。
 /// </summary>
 public sealed partial class CleanupViewModel : ObservableObject
 {
-    /// <summary>预览列表上限：百万级下也只取前 N 封，避免一次性载入。</summary>
-    private const int PreviewLimit = 500;
+    /// <summary>单页条数：分页加载，避免十万级匹配一次性塞进列表。</summary>
+    public const int PageSize = 50;
 
     private readonly ICleanupService _cleanup;
     private readonly IStorageMonitor _monitor;
@@ -89,6 +133,26 @@ public sealed partial class CleanupViewModel : ObservableObject
     [ObservableProperty] private bool _protectStarred = true;
     [ObservableProperty] private bool _protectUnread = true;
 
+    /// <summary>
+    /// 仅清理正文与附件：命中邮件保留在列表里，只清空正文并删掉附件文件，
+    /// 阅读时按需重新下载；不进入隔离区，因此清理记录里不可撤销。
+    /// </summary>
+    [ObservableProperty] private bool _clearBodyOnly;
+
+    /// <summary>主按钮文案随模式变化，避免「一键清理」在仅清正文时被误解为删邮件。</summary>
+    public string CleanupByFilterText => ClearBodyOnly ? "清理正文" : "一键清理";
+
+    public string CleanupSelectedText => ClearBodyOnly ? "清理选中正文" : "清理选中";
+
+    partial void OnClearBodyOnlyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CleanupByFilterText));
+        OnPropertyChanged(nameof(CleanupSelectedText));
+
+        // 匹配数量不变，但「预计释放」口径变了：已有预览就按新模式翻新当前页（保留勾选）
+        if (HasPreview) _ = LoadPageAsync(_pageIndex);
+    }
+
     // ---------------- 预览与进度 ----------------
 
     public ObservableCollection<CleanupItemRow> PreviewItems { get; } = new();
@@ -100,6 +164,31 @@ public sealed partial class CleanupViewModel : ObservableObject
     [ObservableProperty] private int _previewCount;
     [ObservableProperty] private string _previewSize = "";
     [ObservableProperty] private int _selectedRows;
+
+    /// <summary>跨页勾选集合：翻页 / 全选 / 反选都只动这一份。</summary>
+    private readonly CleanupSelection _selection = new();
+
+    private int _pageIndex;
+
+    /// <summary>当前列表用的筛选条件：「全选 / 反选」以它为范围，避免筛选改了没预览导致勾到看不见的邮件。</summary>
+    private CleanupFilter? _previewFilter;
+
+    /// <summary>匹配结果总页数（至少 1 页，方便显示「第 1 / 1 页」）。</summary>
+    [ObservableProperty] private int _pageCount = 1;
+
+    public int CurrentPage => _pageIndex + 1;
+
+    public string PageInfo => $"第 {CurrentPage} / {PageCount} 页";
+
+    public bool CanGoPrevious => !IsRunning && _pageIndex > 0;
+
+    public bool CanGoNext => !IsRunning && _pageIndex + 1 < PageCount;
+
+    /// <summary>选择类按钮的统一可用性：有匹配结果且没有任务在跑。</summary>
+    public bool CanSelect => PreviewCount > 0 && !IsRunning;
+
+    /// <summary>「清理选中」只在真的勾了邮件时可用，避免空点。</summary>
+    public bool CanCleanupSelected => _selection.Count > 0 && !IsRunning;
 
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private bool _isPreviewing;
@@ -173,8 +262,6 @@ public sealed partial class CleanupViewModel : ObservableObject
 
     partial void OnStorageChanged(StorageSnapshot? value) => OnPropertyChanged(nameof(StorageSummary));
 
-    partial void OnPreviewCountChanged(int value) => OnPropertyChanged(nameof(HasPreview));
-
     partial void OnIsRunningChanged(bool value)
     {
         ResumeCommand.NotifyCanExecuteChanged();
@@ -182,6 +269,16 @@ public sealed partial class CleanupViewModel : ObservableObject
         PurgeCommand.NotifyCanExecuteChanged();
         CleanupByFilterCommand.NotifyCanExecuteChanged();
         CleanupSelectedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanSelect));
+        OnPropertyChanged(nameof(CanCleanupSelected));
+        OnPropertyChanged(nameof(CanGoPrevious));
+        OnPropertyChanged(nameof(CanGoNext));
+    }
+
+    partial void OnPreviewCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasPreview));
+        OnPropertyChanged(nameof(CanSelect));
     }
 
     private void OnProgress(CleanupProgress progress)
@@ -214,7 +311,8 @@ public sealed partial class CleanupViewModel : ObservableObject
         OnlyWithAttachments = OnlyWithAttachments,
         Extensions = ParseExtensions(Extensions),
         ProtectStarred = ProtectStarred,
-        ProtectUnread = ProtectUnread
+        ProtectUnread = ProtectUnread,
+        ClearBodyOnly = ClearBodyOnly
     };
 
     private static long ParseMb(string text) =>
@@ -227,24 +325,82 @@ public sealed partial class CleanupViewModel : ObservableObject
         .Distinct()
         .ToList();
 
+    /// <summary>按当前筛选条件重新预览：回到第一页并清空勾选（条件变了，旧的勾选不再可信）。</summary>
     [RelayCommand]
     private async Task PreviewAsync()
+    {
+        _selection.Clear();
+        NotifySelectionChanged();
+        _previewSummaryKey = "";                 // 数据可能变了（刚清理完/撤销），强制重算汇总
+        await LoadPageAsync(0);
+    }
+
+    /// <summary>上一次汇总对应的筛选条件与数字：翻页时直接复用，避免每页都跑 COUNT/SUM。</summary>
+    private string _previewSummaryKey = "";
+    private int _previewTotal;
+    private long _previewTotalBytes;
+    private long _previewAttachmentBytes;
+    private long _previewReclaimableBytes;
+
+    /// <summary>加载指定页（0 基）。勾选集合跨页保留，行勾选状态由集合回填。</summary>
+    private async Task LoadPageAsync(int pageIndex)
     {
         if (IsPreviewing || IsRunning) return;
 
         IsPreviewing = true;
         try
         {
-            var preview = await _cleanup.PreviewAsync(BuildFilter(), PreviewLimit);
-            PreviewItems.Clear();
-            foreach (var item in preview.Items) PreviewItems.Add(new CleanupItemRow(item));
+            var index = Math.Max(0, pageIndex);
+            var filter = BuildFilter();
+            var offset = index * PageSize;
+            var key = BuildPreviewKey(filter);
 
-            PreviewCount = preview.TotalCount;
-            PreviewSize = preview.TotalSizeDisplay;
-            RecalculateSelection();
-            StatusText = preview.TotalCount == 0
+            IReadOnlyList<CleanupPreviewItem> items;
+            int total;
+
+            // SQLite 的「异步」底层同步执行：预览查询放线程池，界面线程只做行对象与属性赋值
+            if (key != _previewSummaryKey)
+            {
+                var preview = await Task.Run(() => _cleanup.PreviewAsync(filter, PageSize, offset))
+                    .ConfigureAwait(true);
+                _previewSummaryKey = key;
+                _previewTotal = preview.TotalCount;
+                _previewTotalBytes = preview.TotalBytes;
+                _previewAttachmentBytes = preview.AttachmentBytes;
+                _previewReclaimableBytes = preview.ReclaimableBytes;
+                items = preview.Items;
+                total = preview.TotalCount;
+            }
+            else
+            {
+                items = await Task.Run(() => _cleanup.PreviewItemsAsync(filter, PageSize, offset))
+                    .ConfigureAwait(true);
+                total = _previewTotal;
+            }
+
+            _previewFilter = filter;
+            PreviewCount = total;
+            PageCount = Math.Max(1, (total + PageSize - 1) / PageSize);
+            _pageIndex = Math.Min(index, PageCount - 1);
+
+            PreviewItems.Clear();
+            foreach (var item in items)
+            {
+                PreviewItems.Add(new CleanupItemRow(item) { IsSelected = _selection.Contains(item.Id) });
+            }
+
+            PreviewSize = ClearBodyOnly
+                ? DisplayFormat.FileSize(_previewReclaimableBytes)
+                : DisplayFormat.FileSize(_previewTotalBytes + _previewAttachmentBytes);
+            NotifyPageChanged();
+            NotifySelectionChanged();
+
+            StatusText = total == 0
                 ? "当前条件没有匹配的邮件"
-                : $"匹配 {preview.TotalCount:N0} 封，合计 {preview.TotalSizeDisplay}";
+                : (ClearBodyOnly
+                    ? $"匹配 {total:N0} 封，预计清空正文与附件 {PreviewSize}"
+                    : $"匹配 {total:N0} 封，合计 {PreviewSize}")
+                  + (PageCount > 1 ? $"（第 {CurrentPage} / {PageCount} 页）" : "");
         }
         catch (Exception ex)
         {
@@ -257,11 +413,129 @@ public sealed partial class CleanupViewModel : ObservableObject
         }
     }
 
-    /// <summary>预览行勾选变化后刷新汇总（由界面在勾选时调用）。</summary>
-    public void RecalculateSelection()
+    /// <summary>汇总缓存的键：任一筛选条件变化都要重算 COUNT/SUM。</summary>
+    private static string BuildPreviewKey(CleanupFilter filter) => string.Join('|',
+        filter.AccountId, filter.FolderId,
+        filter.IncludeTrash, filter.IncludeJunk, filter.IncludeArchive, filter.IncludeInbox, filter.IncludeSent,
+        filter.BeforeUtc?.ToUnixTimeSeconds(), filter.AfterUtc?.ToUnixTimeSeconds(),
+        filter.MinSizeBytes, filter.MaxSizeBytes, filter.OnlyWithAttachments,
+        string.Join(',', filter.Extensions), filter.ProtectStarred, filter.ProtectUnread, filter.ClearBodyOnly);
+
+    private void NotifyPageChanged()
     {
-        SelectedRows = PreviewItems.Count(r => r.IsSelected);
+        OnPropertyChanged(nameof(CurrentPage));
+        OnPropertyChanged(nameof(PageInfo));
+        OnPropertyChanged(nameof(CanGoPrevious));
+        OnPropertyChanged(nameof(CanGoNext));
     }
+
+    // ---------------- 勾选：单页 / 整批 ----------------
+
+    /// <summary>单行勾选（界面点击）：只改这一条，不回读整页状态，避免虚拟化容器的空跑事件写歪集合。</summary>
+    public void SetRowSelected(CleanupItemRow row, bool selected)
+    {
+        row.IsSelected = selected;
+        _selection.Set(row.Id, selected);
+        NotifySelectionChanged();
+    }
+
+    /// <summary>把当前页行的勾选状态重设为集合里的值（全选 / 反选后调用，不触发清理）。</summary>
+    private void SyncPageSelection()
+    {
+        foreach (var row in PreviewItems)
+        {
+            row.IsSelected = _selection.Contains(row.Id);
+        }
+    }
+
+    private void NotifySelectionChanged()
+    {
+        SelectedRows = _selection.Count;
+        OnPropertyChanged(nameof(CanSelect));
+        OnPropertyChanged(nameof(CanCleanupSelected));
+        CleanupSelectedCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void SelectPage()
+    {
+        foreach (var row in PreviewItems)
+        {
+            row.IsSelected = true;
+            _selection.Set(row.Id, true);
+        }
+
+        NotifySelectionChanged();
+    }
+
+    [RelayCommand]
+    private void InvertPage()
+    {
+        foreach (var row in PreviewItems)
+        {
+            var next = !_selection.Contains(row.Id);
+            row.IsSelected = next;
+            _selection.Set(row.Id, next);
+        }
+
+        NotifySelectionChanged();
+    }
+
+    /// <summary>全选当前筛选下的全部邮件（跨页），只取 id，不加载列表。</summary>
+    [RelayCommand]
+    private async Task SelectAllAsync()
+    {
+        if (IsRunning) return;
+
+        try
+        {
+            var ids = await _cleanup.GetMatchingIdsAsync(_previewFilter ?? BuildFilter());
+            _selection.SelectAll(ids);
+            SyncPageSelection();
+            NotifySelectionChanged();
+            StatusText = $"已勾选全部 {_selection.Count:N0} 封（共 {PageCount} 页），点「{CleanupSelectedText}」执行";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "全选匹配邮件失败");
+            StatusText = "全选失败：" + ex.Message;
+        }
+    }
+
+    /// <summary>反选当前筛选下的全部邮件：原来勾上的取消，没勾的勾上。</summary>
+    [RelayCommand]
+    private async Task InvertAllAsync()
+    {
+        if (IsRunning) return;
+
+        try
+        {
+            var ids = await _cleanup.GetMatchingIdsAsync(_previewFilter ?? BuildFilter());
+            _selection.InvertAll(ids);
+            SyncPageSelection();
+            NotifySelectionChanged();
+            StatusText = _selection.Count == 0
+                ? "已反选：当前没有勾选的邮件"
+                : $"已反选，勾选 {_selection.Count:N0} 封";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "反选匹配邮件失败");
+            StatusText = "反选失败：" + ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private Task FirstPageAsync() => LoadPageAsync(0);
+
+    [RelayCommand]
+    private Task PreviousPageAsync() => LoadPageAsync(_pageIndex - 1);
+
+    [RelayCommand]
+    private Task NextPageAsync() => LoadPageAsync(_pageIndex + 1);
+
+    [RelayCommand]
+    private Task LastPageAsync() => LoadPageAsync(PageCount - 1);
 
     // ---------------- 执行 ----------------
 
@@ -271,50 +545,64 @@ public sealed partial class CleanupViewModel : ObservableObject
         if (IsRunning) return;
 
         var filter = BuildFilter();
+        var bodyOnly = ClearBodyOnly;
         var confirm = _dialogs.Confirm(
-            "一键清理",
-            "确定按当前筛选条件清理邮件吗？",
-            primaryText: "开始清理",
+            bodyOnly ? "清理正文与附件" : "一键清理",
+            bodyOnly ? "确定按当前筛选条件清空正文与附件吗？" : "确定按当前筛选条件清理邮件吗？",
+            primaryText: bodyOnly ? "开始清理正文" : "开始清理",
             detail: (HasScope ? $"作用域：{ScopeLabel}\n" : string.Empty)
                     + $"{filter.Describe()}\n"
                     + $"文件夹：{DescribeFolders(filter)}\n"
-                    + $"匹配数量：{PreviewCount:N0} 封（约 {PreviewSize}）\n"
-                    + "清理后进入隔离区，保留期内可一键撤销。",
+                    + $"匹配数量：{PreviewCount:N0} 封（{(bodyOnly ? "可清空约" : "约")} {PreviewSize}）\n"
+                    + (bodyOnly
+                        ? "邮件本身保留，只清空已下载正文并删除附件文件，阅读时重新下载。\n此模式不进入隔离区，不可撤销。"
+                        : "清理后进入隔离区，保留期内可一键撤销。"),
             icon: DialogIcon.Warning,
             danger: true);
         if (!confirm) return;
 
         await RunAsync(
             async ct => (CleanupJob?)await _cleanup.ExecuteAsync(filter, null, CleanupMode.Filter, _progress, ct),
-            "清理");
+            bodyOnly ? "清理正文" : "清理");
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanCleanupSelectedCommand))]
     private async Task CleanupSelectedAsync()
     {
         if (IsRunning) return;
 
-        var ids = PreviewItems.Where(r => r.IsSelected).Select(r => r.Id).ToList();
+        var ids = _selection.Snapshot();
         if (ids.Count == 0)
         {
             StatusText = "请先在列表中勾选要清理的邮件";
             return;
         }
 
+        var bodyOnly = ClearBodyOnly;
         var confirm = _dialogs.Confirm(
-            "勾选清理",
-            $"确定清理手动勾选的 {ids.Count:N0} 封邮件吗？",
-            primaryText: "开始清理",
-            detail: $"列表展示上限 {PreviewLimit} 封。\n清理后进入隔离区，保留期内可一键撤销。",
+            bodyOnly ? "清理选中的正文" : "清理选中",
+            bodyOnly
+                ? $"确定清空选中的 {ids.Count:N0} 封邮件的正文与附件吗？"
+                : $"确定清理选中的 {ids.Count:N0} 封邮件吗？",
+            primaryText: bodyOnly ? "开始清理正文" : "开始清理",
+            detail: $"勾选可以跨页，本次共 {ids.Count:N0} 封（匹配总数 {PreviewCount:N0} 封）。\n"
+                    + (bodyOnly
+                        ? "邮件本身保留，阅读时重新下载。此模式不进入隔离区，不可撤销。"
+                        : "清理后进入隔离区，保留期内可一键撤销。"),
             icon: DialogIcon.Warning,
             danger: true);
         if (!confirm) return;
 
+        // 筛选条件在 UI 线程先算好，别让后台线程去读界面属性
+        var filter = BuildFilter();
         await RunAsync(
             async ct => (CleanupJob?)await _cleanup.ExecuteAsync(
-                BuildFilter(), ids, CleanupMode.Selected, _progress, ct),
-            "勾选清理");
+                filter, ids, CleanupMode.Selected, _progress, ct),
+            bodyOnly ? "清理选中正文" : "清理选中");
     }
+
+    /// <summary>「清理选中」只在真的勾了邮件时可用（命令侧门禁，界面另有 IsEnabled 绑定）。</summary>
+    private bool CanCleanupSelectedCommand() => _selection.Count > 0 && !IsRunning;
 
     private async Task RunAsync(
         Func<CancellationToken, Task<CleanupJob?>> action, string verb)
@@ -326,7 +614,8 @@ public sealed partial class CleanupViewModel : ObservableObject
 
         try
         {
-            var job = await action(_cts.Token);
+            // 清理是「逐批 SQL + 文件移动」的重活，必须离开界面线程：否则进度回调排不上队、窗口假死
+            var job = await Task.Run(() => action(_cts.Token), _cts.Token).ConfigureAwait(true);
             if (job is null)
             {
                 StatusText = $"{verb}未执行：没有匹配的邮件";

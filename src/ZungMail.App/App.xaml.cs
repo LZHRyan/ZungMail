@@ -36,6 +36,9 @@ public partial class App : System.Windows.Application
     /// <summary>启动计时：从进程入口到首帧、到界面可交互的每一段，用来定位「启动慢」。</summary>
     private readonly List<string> _startupStages = new();
 
+    /// <summary>摘要引擎插件的加载结果（宿主起来后再落日志）。</summary>
+    private IReadOnlyList<string> _summaryModuleReports = Array.Empty<string>();
+
     /// <summary>记录一段启动耗时：先落一行日志（卡住时最后一行就是卡点），再累积到汇总行。</summary>
     private void MarkStartupStage(string stage)
     {
@@ -86,6 +89,9 @@ public partial class App : System.Windows.Application
         });
         builder.Services.AddZungMailMail();
         builder.Services.AddZungMailApplication();
+
+        // 摘要引擎插件：本地小模型由独立程序集通过反射注册；失败只降级，不影响启动
+        _summaryModuleReports = SummaryModuleCatalog.Register(builder.Services);
         builder.Services.AddSingleton<ThemeManager>();
         builder.Services.AddSingleton<IDialogService, DialogService>();
         builder.Services.AddSingleton<AttachmentActionService>();
@@ -104,6 +110,9 @@ public partial class App : System.Windows.Application
         // 独立阅读窗口：视图模型与窗口宿主都是单例，双击只切换内容、不重复开窗
         builder.Services.AddSingleton<MailReaderViewModel>();
         builder.Services.AddSingleton<MailReaderWindowService>();
+
+        // 邮件摘要卡片：两个阅读窗口各一份状态（transient，互不影响）
+        builder.Services.AddTransient<MailSummaryViewModel>();
 
         // 查看邮件源码：主窗口列表右键与阅读窗口共用同一个单实例窗口
         builder.Services.AddSingleton<MailSourceViewModel>();
@@ -150,6 +159,14 @@ public partial class App : System.Windows.Application
                 .LogInformation("{Notice}", notice);
         }
 
+        // 摘要引擎插件加载结果：程序集缺失或原生库坏掉时，这里能直接看到是哪一步失败
+        foreach (var report in _summaryModuleReports)
+        {
+            _host.Services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("ZungMail.Summary")
+                .LogInformation("摘要引擎插件：{Report}", report);
+        }
+
         // 改名遗留：旧「开机自启」值指向已被卸载的 MailClient.exe，存在则迁移到本程序
         _host.Services.GetRequiredService<IStartupLaunchService>().MigrateLegacyValue();
 
@@ -161,9 +178,6 @@ public partial class App : System.Windows.Application
         // 显式先解析一次，把这段耗时从「宿主启动」里单独拆出来。
         _ = _host.Services.GetRequiredService<DatabaseInitializer>();
         MarkStartupStage("数据库初始化");
-
-        await _host.StartAsync().ConfigureAwait(true);
-        MarkStartupStage("宿主启动");
 
         var settings = _host.Services.GetRequiredService<ISettingsStore>();
         await settings.LoadAsync().ConfigureAwait(true);
@@ -186,6 +200,9 @@ public partial class App : System.Windows.Application
         await Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         MarkStartupStage("首帧");
 
+        // 首帧之后再装 UI 占用探针：心跳要等窗口真的画出来才有意义，也不占启动关键路径
+        UiThreadProbe.Attach(Dispatcher);
+
         // 首帧之后再补图形 / WebView2：拉 WinForms + WPF 媒体 + WebView2 探测要上百毫秒，
         // 不放在「窗口出现」之前的关键路径上。渲染 Tier 与 DPI 直接决定窗口绘制快慢。
         StartupEnvironment.LogGraphics();
@@ -205,6 +222,12 @@ public partial class App : System.Windows.Application
             }
         }
         MarkStartupStage("托盘热键");
+
+        // 宿主服务放到窗口显示、托盘就绪之后启动：首轮里的 DB 调用是「假异步」（同步完成），
+        // 早启动会把首屏查询挤在同一个 UI 线程上；各 ExecuteAsync 首行已 await Task.Yield，
+        // StartAsync 只等到第一次让出就返回，不会把首轮搬回这里执行。
+        await _host.StartAsync().ConfigureAwait(true);
+        MarkStartupStage("宿主启动");
 
         var viewModel = _host.Services.GetRequiredService<MainViewModel>();
         await viewModel.InitializeAsync().ConfigureAwait(true);

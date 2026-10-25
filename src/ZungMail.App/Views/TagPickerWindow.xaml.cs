@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using ZungMail.Application.Services;
 using ZungMail.Core.Domain;
@@ -74,10 +76,18 @@ public partial class TagPickerWindow : DialogWindow
     {
         try
         {
-            foreach (var row in _rows)
+            // 界面上先把勾选方案取下来：之后整批复用（每个标签一条事务），全过程在后台线程
+            var plan = _rows.Select(row => (row.Id, row.IsChecked)).ToList();
+            var emailIds = _emailIds;
+
+            await Task.Run(async () =>
             {
-                await _service.ApplyAsync(_emailIds, row.Id, row.IsChecked);
-            }
+                foreach (var (tagId, isChecked) in plan)
+                {
+                    await _service.ApplyAsync(emailIds, tagId, isChecked).ConfigureAwait(false);
+                }
+            });
+
             DialogResult = true;
             Close();
         }

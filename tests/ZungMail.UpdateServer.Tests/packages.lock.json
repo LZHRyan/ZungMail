@@ -180,7 +180,7 @@
         "type": "Project",
         "dependencies": {
           "AngleSharp": "[1.8.5, )",
-          "ZungMail.Update.Protocol": "[1.2.1, )"
+          "ZungMail.Update.Protocol": "[1.3.4, )"
         }
       },
       "zungmail.infrastructure": {
@@ -189,8 +189,8 @@
           "Microsoft.Data.Sqlite": "[8.0.10, )",
           "Microsoft.Extensions.Logging.Abstractions": "[8.0.2, )",
           "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
-          "ZungMail.Core": "[1.2.1, )",
-          "ZungMail.Update.Protocol": "[1.2.1, )"
+          "ZungMail.Core": "[1.3.4, )",
+          "ZungMail.Update.Protocol": "[1.3.4, )"
         }
       },
       "zungmail.update.protocol": {
@@ -199,7 +199,7 @@
       "zungmail.updateserver": {
         "type": "Project",
         "dependencies": {
-          "ZungMail.Update.Protocol": "[1.2.1, )"
+          "ZungMail.Update.Protocol": "[1.3.4, )"
         }
       }
     }

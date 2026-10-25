@@ -239,6 +239,13 @@
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
+    <!-- 状态栏专用紧凑按钮：状态栏整体只有 32 高，不能用 Btn 的 MinHeight=32 把整条撑起来 -->
+    <Style x:Key="StatusBarButton" TargetType="ButtonBase" BasedOn="{StaticResource BtnGhost}">
+        <Setter Property="MinHeight" Value="22" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
     <!-- 危险操作主按钮：删除 / 彻底清理这类不可撤销的确认，沿用主按钮模板只换底色 -->
     <Style x:Key="BtnDanger" TargetType="ButtonBase" BasedOn="{StaticResource BtnPrimary}">
         <Setter Property="Background" Value="{DynamicResource CriticalBrush}" />

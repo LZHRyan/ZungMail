@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -97,6 +98,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         UpdateWindowService updateWindowService,
         IUpdateService updateService,
         IFeedbackService feedbackService,
+        ISummaryModelStore summaryModels,
+        IMailSummaryService summaryService,
         ILogger<SettingsViewModel> logger)
     {
         _settings = settings;
@@ -122,6 +125,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _dialogs = dialogs;
         _dataDirectories = dataDirectories;
         _logger = logger;
+        _summaryModels = summaryModels;
+        _summaryService = summaryService;
 
         InitializeUpdate(updateCoordinator, updateWindowService, updateService);
         InitializeFeedback(feedbackService);
@@ -129,6 +134,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         Sections = new List<SettingsSection>
         {
             new("general", "通用", "IcoGear"),
+            new("ai", "本地 AI 助手", "IcoSummary"),
             new("accounts", "账户", "IcoUsers"),
             new("signature", "签名", "IcoCompose"),
             new("templates", "模板", "IcoTemplate"),
@@ -196,6 +202,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     // ---------------- 分区可见性 ----------------
 
     public bool IsGeneralSection => SelectedSection.Key == "general";
+    public bool IsAiSection => SelectedSection.Key == "ai";
     public bool IsAccountsSection => SelectedSection.Key == "accounts";
     public bool IsSignatureSection => SelectedSection.Key == "signature";
     public bool IsTemplatesSection => SelectedSection.Key == "templates";
@@ -210,9 +217,28 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>关于页展示的版本号：由 <see cref="AppVersionInfo"/> 统一提供（去源码链接后缀）。</summary>
     public string AppVersion => AppVersionInfo.Display;
 
+    /// <summary>
+    /// 关于页「运行环境」卡片的本机实测行：只放能立刻算出来的两项（.NET 运行时、WebView2 内核），
+    /// 用来对照上面写的最低要求，反馈问题时也方便一眼看出环境。
+    /// </summary>
+    public string LocalEnvironmentText
+    {
+        get
+        {
+            var framework = RuntimeInformation.FrameworkDescription;
+            var webView2 = WebViewRuntimeProbe.IsAvailable
+                ? $"WebView2 {WebViewRuntimeProbe.Version}"
+                : "未检测到 WebView2 运行时（邮件正文将退化为纯文本）";
+            var arch = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+
+            return $"本机：{framework} · {arch} · {webView2}";
+        }
+    }
+
     partial void OnSelectedSectionChanged(SettingsSection value)
     {
         OnPropertyChanged(nameof(IsGeneralSection));
+        OnPropertyChanged(nameof(IsAiSection));
         OnPropertyChanged(nameof(IsAccountsSection));
         OnPropertyChanged(nameof(IsSignatureSection));
         OnPropertyChanged(nameof(IsTemplatesSection));
@@ -516,6 +542,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         await ReloadTemplatesAsync();
         SyncAutoLockIndex();
         SyncGlobalHotkeyState();
+        RefreshMailSummaryModelStatus();
         ImportAccount ??= Accounts.FirstOrDefault();
     }
 
@@ -2555,7 +2582,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         StatusText = "正在打包本地数据…";
         try
         {
-            var path = await _exporter.ExportAsync(dialog.FileName);
+            var path = await Task.Run(() => _exporter.ExportAsync(dialog.FileName)).ConfigureAwait(true);
             StatusText = "已导出到 " + path;
         }
         catch (Exception ex)
@@ -2606,7 +2633,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             var progress = new Progress<int>(count => StatusText = $"正在重建搜索索引… 已处理 {count} 封");
-            var count = await _messages.RebuildSearchIndexAsync(progress);
+            // 逐封读正文 + 重建 FTS 是秒级重活，放线程池；进度用 Progress<int> 回 UI
+            var count = await Task.Run(() => _messages.RebuildSearchIndexAsync(progress)).ConfigureAwait(true);
             StatusText = $"搜索索引已重建，共处理 {count} 封邮件";
         }
         catch (Exception ex)
@@ -2877,7 +2905,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            var freed = await _cleanup.PurgeExpiredAsync();
+            var freed = await Task.Run(() => _cleanup.PurgeExpiredAsync()).ConfigureAwait(true);
             await RefreshStorageAsync();
             StatusText = freed > 0
                 ? $"已清理超期隔离数据，释放 {DisplayFormat.FileSize(freed)}"

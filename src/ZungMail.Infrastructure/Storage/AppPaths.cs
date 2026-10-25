@@ -12,8 +12,10 @@ public sealed class AppPaths : IAppPaths
 {
     public AppPaths()
     {
-        // 首次启动时指针不存在 → 使用默认目录
-        RootDirectory = new DataDirectoryPointer().Read().DataDirectory;
+        // 首次启动时指针不存在 → 使用默认目录；
+        // 有待迁移时仍落在源目录（详见 DataDirectoryPointer.ResolveEffective），
+        // 否则启动瞬间的日志会写进目标目录，把下一次迁移挡在「目录不是空的」外面。
+        RootDirectory = DataDirectoryPointer.ResolveEffective(new DataDirectoryPointer().Read());
     }
 
     public AppPaths(string rootDirectory)

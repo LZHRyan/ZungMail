@@ -26,6 +26,9 @@ public sealed class FileDataExporter : IDataExporter
         // 注：checkpoint 需要写权限，因此这里用可读写连接而非只读打开。
         await CheckpointAsync(ct).ConfigureAwait(false);
 
+        // 连接池会保持 db 文件句柄：复制前先清池，保证三个文件都能被独占读取
+        SqliteConnection.ClearAllPools();
+
         if (File.Exists(target)) File.Delete(target);
 
         using (var archive = ZipFile.Open(target, ZipArchiveMode.Create))

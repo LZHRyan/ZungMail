@@ -246,6 +246,124 @@ VALUES(@messageId, @name, 'application/octet-stream', @size, 0, @path);
         Assert.Equal(0, CountMessages());
     }
 
+    [Fact]
+    public async Task 预览_支持分页且页间不重叠()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            AddMessage(TrashFolder, "分页-" + i, DateTimeOffset.UtcNow.AddDays(-i - 1));
+        }
+
+        var page1 = await _cleanup.PreviewAsync(new CleanupFilter(), take: 2, skip: 0);
+        var page2 = await _cleanup.PreviewAsync(new CleanupFilter(), take: 2, skip: 2);
+        var page3 = await _cleanup.PreviewAsync(new CleanupFilter(), take: 2, skip: 4);
+
+        // 总量始终是匹配总数，不随分页变化
+        Assert.Equal(5, page1.TotalCount);
+        Assert.Equal(5, page2.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(2, page2.Items.Count);
+        Assert.Single(page3.Items);
+
+        // 按时间倒序，页与页之间不重复
+        Assert.Equal("分页-0", page1.Items[0].Subject);
+        Assert.Empty(page1.Items.Select(i => i.Id).Intersect(page2.Items.Select(i => i.Id)));
+        Assert.Empty(page2.Items.Select(i => i.Id).Intersect(page3.Items.Select(i => i.Id)));
+        Assert.Empty(page1.Items.Select(i => i.Id).Intersect(page3.Items.Select(i => i.Id)));
+    }
+
+    [Fact]
+    public async Task 全选ID_按筛选返回全部匹配且仍受保护条件限制()
+    {
+        var trash = AddMessage(TrashFolder, "垃圾箱普通邮件");
+        AddMessage(InboxFolder, "收件箱邮件");
+        AddMessage(TrashFolder, "星标邮件", flags: MessageFlags.Seen | MessageFlags.Flagged);
+
+        var ids = await _cleanup.GetMatchingIdsAsync(new CleanupFilter());
+
+        Assert.Equal(new[] { trash }, ids);
+    }
+
+    [Fact]
+    public async Task 仅清正文_保留邮件头并清空正文与附件文件()
+    {
+        var id = AddMessage(TrashFolder, "老邮件", attachments: new[] { ("报表.pdf", 512L) });
+        var directory = Path.Combine(_root, "eml", "1", id.ToString());
+        Directory.CreateDirectory(directory);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "报表.pdf"), new byte[512]);
+
+        var filter = new CleanupFilter { ClearBodyOnly = true };
+
+        // 预览的可释放口径＝正文 + 附件，不是整封邮件大小
+        var preview = await _cleanup.PreviewAsync(filter);
+        Assert.Equal(1, preview.TotalCount);
+        Assert.True(preview.ReclaimableBytes > 0);
+        Assert.True(preview.ReclaimableBytes < preview.TotalBytes + preview.AttachmentBytes);
+
+        var job = await _cleanup.ExecuteAsync(filter, null, CleanupMode.Filter);
+
+        Assert.True(job.IsBodyOnly);
+        Assert.Equal(CleanupStatus.Completed, job.Status);
+        Assert.Equal(1, job.ProcessedCount);
+        Assert.True(job.TotalBytes > 0);
+        Assert.False(job.CanUndo);
+        Assert.False(job.CanPurge);
+
+        // 邮件本身留着：主题等邮件头不变，正文与附件都清空
+        Assert.Equal(1, CountMessages());
+        var detail = await _messages.GetDetailAsync(id);
+        Assert.NotNull(detail);
+        Assert.Equal("老邮件", detail!.Subject);
+        Assert.Empty(detail.Attachments);
+        Assert.Equal((0, (string?)null), ReadBody(id));
+        Assert.Equal(0, CountAttachments(id));
+        Assert.False(Directory.Exists(directory));
+
+        // 审计记录能识别成「仅清正文」，且不会被撤销 / 彻底删除改写状态
+        var audit = Assert.Single(await _cleanup.GetJobsAsync());
+        Assert.True(audit.IsBodyOnly);
+        Assert.Contains("仅清正文", audit.ModeDisplay);
+        Assert.Equal(0, await _cleanup.UndoAsync(job.Id));
+        Assert.Equal(0, await _cleanup.PurgeAsync(job.Id));
+        Assert.Equal(CleanupStatus.Completed, Assert.Single(await _cleanup.GetJobsAsync()).Status);
+    }
+
+    [Fact]
+    public async Task 仅清正文_仍受星标与未读保护限制()
+    {
+        var starred = AddMessage(TrashFolder, "星标老邮件", flags: MessageFlags.Seen | MessageFlags.Flagged);
+        var normal = AddMessage(TrashFolder, "普通老邮件");
+
+        var job = await _cleanup.ExecuteAsync(
+            new CleanupFilter { ClearBodyOnly = true }, null, CleanupMode.Filter);
+
+        Assert.Equal(1, job.ProcessedCount);
+        Assert.Equal(2, CountMessages());
+        Assert.Equal((1, (string?)"正文"), ReadBody(starred));
+        Assert.Equal((0, (string?)null), ReadBody(normal));
+    }
+
+    private (int BodyState, string? BodyText) ReadBody(long messageId)
+    {
+        using var connection = _factory.Create();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT body_state, body_text FROM messages WHERE id = @id;";
+        command.Parameters.AddWithValue("@id", messageId);
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? (reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1))
+            : (-1, null);
+    }
+
+    private long CountAttachments(long messageId)
+    {
+        using var connection = _factory.Create();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM attachments WHERE message_id = @id;";
+        command.Parameters.AddWithValue("@id", messageId);
+        return Convert.ToInt64(command.ExecuteScalar());
+    }
+
     /// <summary>处理满阈值后立即取消，模拟用户中断（同步 Report 保证时序确定）。</summary>
     private sealed class CancelAfterFirstBatch : IProgress<CleanupProgress>
     {
