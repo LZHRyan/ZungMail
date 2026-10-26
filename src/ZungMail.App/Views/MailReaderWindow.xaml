@@ -89,17 +89,13 @@
             </Button>
         </DataTemplate>
 
-        <!-- 标签徽标：只读展示该邮件已打的标签 -->
+        <!-- 标签徽标：只读展示该邮件已打的标签（与主窗口同一套实心白字胶囊） -->
         <DataTemplate x:Key="ReaderTagTemplate">
-            <Grid Margin="0,0,6,4">
-                <Border CornerRadius="6" Opacity="0.16" Background="{Binding Color, Converter={StaticResource HexToBrush}}" />
-                <Border CornerRadius="6" BorderThickness="1" Opacity="0.35" BorderBrush="{Binding Color, Converter={StaticResource HexToBrush}}" />
-                <TextBlock Text="{Binding Name}"
-                           Margin="7,1"
-                           FontSize="10.5"
-                           FontWeight="Bold"
-                           Foreground="{Binding Color, Converter={StaticResource HexToBrush}}" />
-            </Grid>
+            <Border Style="{StaticResource TagChip}"
+                    Margin="0,0,6,4"
+                    Background="{Binding Color, Converter={StaticResource HexToBrush}}">
+                <TextBlock Style="{StaticResource TagChipText}" Text="{Binding Name}" />
+            </Border>
         </DataTemplate>
     </views:DialogWindow.Resources>
 
@@ -546,29 +542,43 @@
                                    HorizontalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- 正文没取到（上次解析失败 / 缓存被清 / 服务器返回空体）：给一个手动补救入口 -->
+                    <!-- 正文没取到（上次解析失败 / 缓存被清 / 服务器返回空体）：给一个显眼的手动补救入口 -->
                     <Border HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            MaxWidth="380"
-                            Padding="20,18"
-                            Background="{DynamicResource WindowBackgroundBrush}"
-                            BorderBrush="{DynamicResource RuleBrush}"
+                            MaxWidth="480"
+                            MinWidth="380"
+                            Padding="30,28"
+                            Background="{DynamicResource AccentSoftBrush}"
+                            BorderBrush="{DynamicResource AccentBrush}"
                             BorderThickness="1"
-                            CornerRadius="10"
+                            CornerRadius="12"
                             Visibility="{Binding ShowReloadBodyButton, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
-                            <TextBlock Text="没有取到正文内容"
-                                       FontSize="14"
-                                       FontWeight="SemiBold"
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Path Style="{StaticResource IconPathButton}"
+                                      Data="{StaticResource IcoAlert}"
+                                      Stroke="{DynamicResource AccentBrush}"
+                                      VerticalAlignment="Center" />
+                                <TextBlock Text="没有取到正文内容"
+                                           Margin="8,0,0,0"
+                                           FontSize="16.5"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource InkBrush}" />
+                            </StackPanel>
+                            <TextBlock Margin="0,12,0,0"
+                                       MaxWidth="400"
+                                       FontSize="12.5"
                                        HorizontalAlignment="Center"
-                                       Foreground="{DynamicResource InkBrush}" />
-                            <TextBlock Style="{StaticResource MutedText}"
-                                       Margin="0,6,0,0"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
+                                       Foreground="{DynamicResource Ink2Brush}"
                                        Text="可能是上次下载没完成或解析失败。若这封邮件本来有正文，重新获取会再向服务器拉一次。" />
                             <Button Style="{StaticResource BtnPrimary}"
-                                    Margin="0,14,0,0"
+                                    Margin="0,20,0,0"
+                                    MinWidth="184"
+                                    MinHeight="38"
+                                    FontSize="13.5"
                                     HorizontalAlignment="Center"
                                     Content="重新获取正文"
                                     Command="{Binding ReloadBodyCommand}" />

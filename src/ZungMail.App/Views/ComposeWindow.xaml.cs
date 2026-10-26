@@ -79,9 +79,10 @@ public partial class ComposeWindow : DialogWindow
     {
         if (result)
         {
-            // 发送成功：直接返回 true 关闭，不再走「保存草稿」询问
+            // 发送成功：直接关闭，不再走「保存草稿」询问。
+            // 写信窗口是非模态的（Show 而非 ShowDialog），不能设 DialogResult——那样会抛异常。
             _sendCompleted = true;
-            DialogResult = true;
+            Close();
             return;
         }
 

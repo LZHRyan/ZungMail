@@ -130,6 +130,13 @@
     <None Include="..\..\src\ZungMail.App\ViewModels\ComposeViewModel.cs"
           Link="Source\ComposeViewModel.cs"
           CopyToOutputDirectory="PreserveNewest" />
+    <!-- 写信窗口非模态：显示方式与 DialogResult 回归 -->
+    <None Include="..\..\src\ZungMail.App\Services\DialogService.cs"
+          Link="Source\DialogService.cs"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ZungMail.App\Views\ComposeWindow.xaml.cs"
+          Link="Source\ComposeWindow.xaml.cs"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\ZungMail.App\App.xaml"
           Link="App.xaml"
           CopyToOutputDirectory="PreserveNewest" />

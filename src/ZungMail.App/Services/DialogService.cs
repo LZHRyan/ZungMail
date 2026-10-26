@@ -174,7 +174,8 @@ public sealed class DialogService : IDialogService
             Get<ILogger<ComposeViewModel>>(),
             request);
 
-        return Show(new ComposeWindow(viewModel));
+        // 写信窗口不模态：写邮件时仍要能回主窗口查邮件、复制内容、看附件
+        return ShowModeless(new ComposeWindow(viewModel));
     }
 
     public bool ShowAccountEditor(Account? account)
@@ -356,12 +357,31 @@ public sealed class DialogService : IDialogService
 
     private T Get<T>() where T : notnull => _provider.GetRequiredService<T>();
 
+    /// <summary>
+    /// 模态显示（设置、账户编辑、附件预览等）：调用方要等用户处理完才继续，期间主窗口不可操作。
+    /// </summary>
     private static bool Show(Window window)
+    {
+        AttachOwner(window);
+        return window.ShowDialog() == true;
+    }
+
+    /// <summary>
+    /// 非模态显示（写信窗口）：可以一边写一边回主窗口翻邮件、复制内容、看附件。
+    /// Owner 仍指向主窗口，所以它不会掉到主窗口后面；关窗时保存草稿等逻辑由窗口自己处理。
+    /// </summary>
+    private static bool ShowModeless(Window window)
+    {
+        AttachOwner(window);
+        window.Show();
+        return true;
+    }
+
+    private static void AttachOwner(Window window)
     {
         if (System.Windows.Application.Current?.MainWindow is { IsLoaded: true } owner && !ReferenceEquals(owner, window))
         {
             window.Owner = owner;
         }
-        return window.ShowDialog() == true;
     }
 }
