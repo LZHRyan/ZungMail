@@ -8,7 +8,7 @@
 # 默认：win-x64 自包含（目标机器无需装 .NET），生成安装包 + 便携 zip + 校验值
 .\packaging\build-installer.ps1
 
-# 生成 x64 MSI（版本号读取 Directory.Build.props，当前 1.3.4）
+# 生成 x64 MSI（版本号读取 Directory.Build.props，当前 1.3.6）
 .\packaging\build-msi.ps1
 ```
 
@@ -55,9 +55,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\Code\MailClient\packaging
 ## x64 与 MSI
 
 - `Directory.Build.props` 统一设置 `PlatformTarget=x64`；NSIS / MSI 发布都使用 `-r win-x64 --self-contained true`，产物 `ZungMail.dll` / `ZungMail.exe` 的 PE machine 为 AMD64。
-- `build-msi.ps1` 默认读取 `Directory.Build.props` 的 `<Version>`（当前 `1.3.4`），产物固定为 `dist\ZungMail-1.3.4-x64.msi`。
+- `build-msi.ps1` 默认读取 `Directory.Build.props` 的 `<Version>`（当前 `1.3.6`），产物固定为 `dist\ZungMail-1.3.6-x64.msi`。
 - WiX 不要求机器预装：仓库 `.config/dotnet-tools.json` 固定 `wix` 5.0.2，脚本先执行 `dotnet tool restore`，再生成 WXS 并 `dotnet wix build -arch x64`。
-- MSI 按机器安装到 `Program Files\ZungMail`，创建开始菜单与桌面快捷方式；ProductName=ZungMail、ProductVersion=1.3.4，SummaryInformation 平台为 x64。
+- MSI 按机器安装到 `Program Files\ZungMail`，创建开始菜单与桌面快捷方式；ProductName=ZungMail、ProductVersion=1.3.6，SummaryInformation 平台为 x64。
 - MSI 只包含程序文件与快捷方式，不写 `%APPDATA%\ZungMail` / `%LOCALAPPDATA%\ZungMail`；卸载不会删除用户邮件与设置。
 - 验证：`msiexec /a`（管理安装解包）在本机返回 1603，不能用来校验载荷；改用「`packaging\obj\msi-publish` 文件数 == 生成 WXS 里的 `<File ` 条数」对账，脚本会自动核对 ProductVersion 与 x64 平台并重算 `SHA256SUMS.txt`。
 - **安装完成后自动启动客户端**：MSI 里的 `LaunchZungMail` 自定义动作（`After="InstallFinalize"`）用 `explorer.exe` 转发启动 `ZungMail.exe`，条件为 `LAUNCHAPP=1 AND NOT REMOVE~="ALL" AND UILevel > 2` —— 卸载与 `msiexec /qn` 静默部署都不启动；运维需要连正常安装也不启动时传 `LAUNCHAPP=0`。
