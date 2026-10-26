@@ -813,13 +813,16 @@ public sealed partial class ComposeViewModel : ObservableObject
             return;
         }
 
-        // 发送前检查：漏附件、空主题这类问题只提示不阻断，用户确认后照常发送
-        var warnings = ComposeSendGuard.Check(new ComposeCheckInput(
-            Subject,
-            BodyHtml,
-            Attachments.Count,
-            to.Count + cc.Count + bcc.Count,
-            _request.Mode is ComposeMode.Reply or ComposeMode.ReplyAll));
+        // 发送前检查：漏附件、空主题这类问题只提示不阻断，用户确认后照常发送。
+        // 设置 → 通用里可以整体关掉（关掉后完全不弹确认框，适合已经习惯自己检查的用户）。
+        var warnings = _settings.Current.SendCheckEnabled
+            ? ComposeSendGuard.Check(new ComposeCheckInput(
+                Subject,
+                BodyHtml,
+                Attachments.Count,
+                to.Count + cc.Count + bcc.Count,
+                _request.Mode is ComposeMode.Reply or ComposeMode.ReplyAll))
+            : Array.Empty<ComposeWarning>();
 
         if (warnings.Count > 0)
         {
@@ -865,38 +868,35 @@ public sealed partial class ComposeViewModel : ObservableObject
         item.AttachmentPaths.AddRange(Attachments.Select(a => a.Path));
 
         IsSending = true;
-        StatusText = scheduled is null ? "正在发送…" : "正在加入发件箱…";
+        StatusText = "正在加入发件箱…";
         try
         {
-            var id = await _outbox.AddAsync(item);
+            await _outbox.AddAsync(item);
 
-            if (scheduled is { } when2 && when2 > DateTimeOffset.UtcNow)
-            {
-                StatusText = $"已加入发件箱，将于 {DisplayFormat.FullDate(when2)} 发送";
-                await DiscardDraftAsync().ConfigureAwait(true);
-                CloseRequested?.Invoke(this, true);
-                return;
-            }
+            // 入队就算「用户这边完成」：清草稿、立刻关窗，投递交给发件箱的后台线程。
+            // 以前这里 await ProcessDueAsync() 等 SMTP 发完才关窗——发一封带附件的邮件
+            // 要等几秒到几十秒，窗口关不掉，用户以为卡死。
+            // 结果（成功 / 失败重试）由托盘气泡与主窗口状态栏反馈，失败件保留在发件箱可重试。
+            await DiscardDraftAsync().ConfigureAwait(true);
 
-            await _processor.ProcessDueAsync();
+            // 窗口马上关，这句是「关窗那一刻」的最终状态，也方便日志/测试核对
+            StatusText = scheduled is { } when2
+                ? $"已加入发件箱，将于 {DisplayFormat.FullDate(when2)} 发送"
+                : "已加入发件箱，正在后台发送";
 
-            var saved = await _outbox.GetAsync(id);
-            if (saved?.State == OutboxState.Sent)
+            CloseRequested?.Invoke(this, true);
+
+            if (scheduled is null)
             {
-                StatusText = "已发送";
-                // 已发出：清掉本地草稿，避免下次打开写信窗口又提示恢复
-                await DiscardDraftAsync().ConfigureAwait(true);
-                CloseRequested?.Invoke(this, true);
-            }
-            else
-            {
-                StatusText = "发送失败：" + (saved?.LastError ?? "未知原因") + "（已保留在发件箱）";
+                // 立刻踢一脚后台投递，不等它返回：马上发的信不用干等 20 秒的调度轮询
+                FireAndForget.Run(() => _processor.ProcessDueAsync(), "立即投递发件箱");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "发送邮件失败：{Subject}", item.Subject);
-            StatusText = "发送失败：" + ex.Message;
+            // 只有「连发件箱都写不进去」才留在窗口里（数据库异常 / 磁盘满）
+            _logger.LogError(ex, "加入发件箱失败：{Subject}", item.Subject);
+            StatusText = "无法加入发件箱：" + ex.Message;
         }
         finally
         {

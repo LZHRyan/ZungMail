@@ -574,6 +574,7 @@
                                 Margin="8,0,0,0"
                                 MinWidth="88"
                                 Content="发送"
+                                ToolTip="发送到发件箱后立刻关窗，后台投递；失败会提示，可在发件箱重试"
                                 Click="OnSendClick"
                                 IsEnabled="{Binding IsSending, Converter={StaticResource InverseBool}}" />
                     </StackPanel>

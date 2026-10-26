@@ -20,14 +20,25 @@
                     PreviewKeyDown="OnReaderPreviewKeyDown">
 
     <views:DialogWindow.Resources>
-        <!-- 附件卡片：与主窗口阅读区同一套交互（单击预览，右键下载 / 另存 / 定位） -->
+        <!-- 附件卡片：与主窗口阅读区同一套交互（双击预览，右键下载 / 复制 / 另存 / 定位） -->
         <DataTemplate x:Key="ReaderAttachmentTemplate">
             <Button Style="{StaticResource AttachmentCard}"
                     Margin="0,0,8,8"
                     Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
-                    Command="{Binding DataContext.PreviewAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                    CommandParameter="{Binding}"
                     ToolTip="{Binding LocalPath}">
+                <Button.InputBindings>
+                    <!-- 双击才打开预览：单击留给选中，避免误触把文件弹出去 -->
+                    <MouseBinding MouseAction="LeftDoubleClick"
+                                  Command="{Binding DataContext.PreviewAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                  CommandParameter="{Binding}" />
+                    <KeyBinding Key="Enter"
+                                Command="{Binding DataContext.PreviewAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                    <KeyBinding Key="C"
+                                Modifiers="Ctrl"
+                                Command="{Binding DataContext.CopyAttachmentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                </Button.InputBindings>
                 <Button.ContextMenu>
                     <ContextMenu Style="{StaticResource MailContextMenu}"
                                  DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
@@ -47,6 +58,12 @@
                         <MenuItem Style="{StaticResource MailContextMenuItem}"
                                   Header="另存为…"
                                   Command="{Binding PlacementTarget.Tag.SaveAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding}" />
+                        <!-- 等价于 Ctrl+C：把附件文件放进剪贴板，可直接粘到资源管理器 / 微信 / 邮件里 -->
+                        <MenuItem Style="{StaticResource MailContextMenuItem}"
+                                  Header="复制"
+                                  InputGestureText="Ctrl+C"
+                                  Command="{Binding PlacementTarget.Tag.CopyAttachmentCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding}" />
                         <Separator Style="{StaticResource MailContextMenuSeparator}" />
                         <MenuItem Style="{StaticResource MailContextMenuItem}"

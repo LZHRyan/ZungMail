@@ -178,6 +178,12 @@ public sealed class AppSettings
     /// </summary>
     public bool ComposeQuickTextPanelVisible { get; set; }
 
+    /// <summary>
+    /// 发送前检查：漏附件、空主题、收件人过多这类问题在发出前弹一次确认（只提示、不阻断）。
+    /// 默认开启；嫌啰嗦的用户可以在设置 → 通用里整体关掉。
+    /// </summary>
+    public bool SendCheckEnabled { get; set; } = true;
+
     // ---------------- 客户端锁定 ----------------
 
     /// <summary>是否启用客户端锁定（需先设置密码）。</summary>

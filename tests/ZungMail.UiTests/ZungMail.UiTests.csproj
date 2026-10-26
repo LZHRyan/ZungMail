@@ -92,6 +92,10 @@
     <None Include="..\..\src\ZungMail.App\Views\MailSourceWindow.xaml"
           Link="Views\MailSourceWindow.xaml"
           CopyToOutputDirectory="PreserveNewest" />
+    <!-- 写邮件窗口：发送按钮的「入发件箱后关窗」提示回归 -->
+    <None Include="..\..\src\ZungMail.App\Views\ComposeWindow.xaml"
+          Link="Views\ComposeWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
     <!-- 大正文渲染止损：解析正文控件源码，确认「写文件导航 + 降级体积门槛」没被删掉 -->
     <None Include="..\..\src\ZungMail.App\Views\MailBodyView.xaml"
           Link="Views\MailBodyView.xaml"
@@ -121,6 +125,10 @@
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\ZungMail.App\App.xaml.cs"
           Link="Source\App.xaml.cs"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- 发送前检查：设置项与写信窗口的开关回归 -->
+    <None Include="..\..\src\ZungMail.App\ViewModels\ComposeViewModel.cs"
+          Link="Source\ComposeViewModel.cs"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\ZungMail.App\App.xaml"
           Link="App.xaml"

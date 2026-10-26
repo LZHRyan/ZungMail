@@ -34,13 +34,12 @@
         "type": "Project",
         "dependencies": {
           "AngleSharp": "[1.8.5, )",
-          "ZungMail.Update.Protocol": "[1.3.4, )"
+          "ZungMail.Update.Protocol": "[1.3.5, )"
         }
       },
       "zungmail.update.protocol": {
         "type": "Project"
       }
-    },
-    "net8.0/win-x64": {}
+    }
   }
 }

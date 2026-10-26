@@ -605,6 +605,10 @@
                                           Content="自动发送阅读收条（对请求回执的邮件）"
                                           ToolTip="默认关闭；开启后打开邮件即自动回复回执，请确认已理解隐私影响"
                                           IsChecked="{Binding Settings.AutoSendReadReceipt}" />
+                                <CheckBox Style="{StaticResource RowCheckBox}"
+                                          Content="发送前检查（漏附件、空主题、收件人过多时先确认一次）"
+                                          ToolTip="只提示、不阻断：确认后照常发送。关闭后点发送会直接进入发送流程，不再弹确认框。"
+                                          IsChecked="{Binding Settings.SendCheckEnabled}" />
 
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                     <TextBlock Style="{StaticResource MutedText}"

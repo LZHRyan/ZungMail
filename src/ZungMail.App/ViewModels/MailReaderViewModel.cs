@@ -644,6 +644,10 @@ public sealed partial class MailReaderViewModel : ObservableObject
     [RelayCommand]
     private void PreviewAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Preview(attachment));
 
+    /// <summary>右键「复制」/ Ctrl+C：把附件文件放进剪贴板。</summary>
+    [RelayCommand]
+    private void CopyAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Copy(attachment));
+
     [RelayCommand]
     private void OpenAttachment(string? path) => ApplyAttachmentStatus(_attachments.Open(path));
 

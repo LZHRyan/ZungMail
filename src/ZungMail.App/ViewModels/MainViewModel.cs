@@ -119,6 +119,7 @@ public sealed partial class MainViewModel : ObservableObject
         IStorageMonitor storageMonitor,
         IMailImportService import,
         MailReceiveNotifier receiveNotifier,
+        IOutboxProcessor outboxProcessor,
         ThemeManager theme,
         IDialogService dialogs,
         AttachmentActionService attachments,
@@ -171,6 +172,11 @@ public sealed partial class MainViewModel : ObservableObject
         _tagService.TagsChanged += OnTagsChanged;
         _receiveNotifier.SyncCompleted += OnBackgroundSyncCompleted;
         _avatars.Changed += OnAvatarsChanged;
+
+        // 发送已改成「入发件箱即关窗」，结果只能靠状态栏 / 托盘反馈（写邮件窗口那时已经关了）
+        outboxProcessor.ItemSent += OnOutboxItemSent;
+        outboxProcessor.ItemFailed += OnOutboxItemFailed;
+
         StartAutoLockTimer();
 
         InitializeUpdate(updateCoordinator, updateWindowService);
@@ -3425,9 +3431,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     // 附件操作统一交给 AttachmentActionService（独立阅读窗口共用同一实现），这里只负责把提示写进状态栏。
 
-    /// <summary>附件单击：优先内置预览（受设置控制），不支持或已关闭时回退到系统程序。</summary>
+    /// <summary>附件双击：优先内置预览（受设置控制），不支持或已关闭时回退到系统程序。</summary>
     [RelayCommand]
     private void PreviewAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Preview(attachment));
+
+    /// <summary>右键「复制」/ Ctrl+C：把附件文件放进剪贴板。</summary>
+    [RelayCommand]
+    private void CopyAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Copy(attachment));
 
     [RelayCommand]
     private void OpenAttachment(string? path) => ApplyAttachmentStatus(_attachments.Open(path));
@@ -3900,6 +3910,14 @@ public sealed partial class MainViewModel : ObservableObject
 
         OnUi(() => _ = ApplyBackgroundSyncAsync(hasNew));
     }
+
+    /// <summary>后台投递成功：写邮件窗口早就关了，这里在状态栏补一句结果。</summary>
+    private void OnOutboxItemSent(object? sender, OutboxItem item)
+        => OnUi(() => StatusText = $"「{item.SubjectDisplay}」已发送");
+
+    /// <summary>后台投递失败：说明还在发件箱里、可重试，避免用户以为信已经发出去了。</summary>
+    private void OnOutboxItemFailed(object? sender, OutboxItem item)
+        => OnUi(() => StatusText = $"「{item.SubjectDisplay}」发送失败：{item.LastError}（已保留在发件箱，可重试）");
 
     private async Task ApplyBackgroundSyncAsync(bool hasNewMail)
     {

@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows;
 using ZungMail.App.Views;
 using ZungMail.Core.Abstractions;
 using ZungMail.Core.Domain;
@@ -9,7 +11,7 @@ using Microsoft.Win32;
 namespace ZungMail.App.Services;
 
 /// <summary>
-/// 附件操作：内置预览 / 本机打开 / 另存 / 定位 / 全部保存。
+/// 附件操作：内置预览 / 本机打开 / 复制到剪贴板 / 另存 / 定位 / 全部保存。
 /// 主窗口阅读区与独立阅读窗口共用同一套行为与提示文案，避免两边各写一份后逐渐漂移。
 /// 每个方法返回需要显示给用户的提示；返回 null 表示无需提示（正常完成或用户取消）。
 /// </summary>
@@ -56,7 +58,7 @@ public sealed class AttachmentActionService
         }
     }
 
-    /// <summary>附件单击：优先内置预览（受设置控制），不支持或已关闭时回退到系统程序。</summary>
+    /// <summary>附件双击：优先内置预览（受设置控制），不支持或已关闭时回退到系统程序。</summary>
     public string? Preview(AttachmentInfo? attachment)
     {
         if (attachment is not { IsDownloaded: true } file) return NotDownloadedHint;
@@ -88,6 +90,44 @@ public sealed class AttachmentActionService
             _logger.LogWarning(ex, "打开附件失败：{Path}", file);
             return "无法打开附件：" + ex.Message;
         }
+    }
+
+    /// <summary>
+    /// 右键「复制」/ Ctrl+C：把附件文件放进剪贴板（FileDrop + 路径文本），
+    /// 可直接粘到资源管理器、聊天窗口或新邮件里。
+    /// </summary>
+    public string? Copy(AttachmentInfo? attachment)
+    {
+        if (attachment is not { IsDownloaded: true } file) return NotDownloadedHint;
+
+        if (file.LocalPath is not { Length: > 0 } path || !File.Exists(path))
+        {
+            return "附件文件不存在，请重新下载后再复制";
+        }
+
+        var data = AttachmentClipboard.BuildDataObject(path);
+
+        // 剪贴板是全局资源：别的程序短暂占用时会抛 ExternalException，退一下重试两次
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                Clipboard.SetDataObject(data, copy: true);
+                return "已复制附件：" + file.FileName;
+            }
+            catch (ExternalException ex)
+            {
+                _logger.LogDebug(ex, "剪贴板被占用，复制附件第 {Attempt} 次重试", attempt);
+                Thread.Sleep(60);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "复制附件到剪贴板失败：{Path}", path);
+                return "复制附件失败：" + ex.Message;
+            }
+        }
+
+        return "复制失败：剪贴板被其它程序占用，请稍后再试";
     }
 
     /// <summary>附件另存为：把已下载到本地的副本复制到用户指定位置。</summary>
