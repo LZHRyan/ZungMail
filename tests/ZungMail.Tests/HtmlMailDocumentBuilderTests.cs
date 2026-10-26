@@ -353,5 +353,53 @@ public sealed class HtmlMailDocumentBuilderTests
     {
         Assert.False(HtmlMailDocumentBuilder.ContainsRemoteImages(body));
     }
+
+    /// <summary>
+    /// 脏 HTML 的第一类形态：正文写在 &lt;body&gt; 之前。以前按「&lt;body&gt;…&lt;/body&gt;」正则截取，
+    /// 开头这段会被整块丢掉 —— 表现就是「对方新写的话不见了，只剩下面的引用历史」。
+    /// </summary>
+    [Fact]
+    public void 正文写在body之前_不丢开头()
+    {
+        const string document =
+            "<html><head><style>p{margin:0}</style></head>" +
+            "<div>Dear,<br>any news??</div>" +
+            "<body><div>Dear Alex</div><div>still checking</div>" +
+            "<hr style=\"width:210px\" color=\"#b5c4df\"></body></html>";
+
+        var html = HtmlMailDocumentBuilder.Build(document, Default);
+
+        Assert.Contains("any news", html);
+        Assert.Contains("still checking", html);
+        // 顺序也要对：新写的话仍排在引用之前
+        Assert.True(html.IndexOf("any news", StringComparison.Ordinal) <
+                    html.IndexOf("still checking", StringComparison.Ordinal));
+    }
+
+    /// <summary>第二类形态：内容追加在 &lt;/body&gt; 之后（有些客户端把签名或尾注放在这里）。</summary>
+    [Fact]
+    public void 内容写在body之后_不丢尾部()
+    {
+        const string document =
+            "<html><body><p>正文</p></body><p>尾部签名</p></html>";
+
+        var html = HtmlMailDocumentBuilder.Build(document, Default);
+
+        Assert.Contains("正文", html);
+        Assert.Contains("尾部签名", html);
+    }
+
+    /// <summary>第三类形态：body 标签没闭合，以前正则会失配后走「剥标签」路径。</summary>
+    [Fact]
+    public void body标签未闭合_正文仍完整()
+    {
+        const string document =
+            "<html><head><meta charset=\"utf-8\"></head><body><p>第一段</p><p>第二段";
+
+        var html = HtmlMailDocumentBuilder.Build(document, Default);
+
+        Assert.Contains("第一段", html);
+        Assert.Contains("第二段", html);
+    }
 }
 

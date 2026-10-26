@@ -1053,7 +1053,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         if (detail.BodyHtml is null || detail.BodyHtml.Length <= MailBodyDocumentCache.InlineBuildMaxChars)
         {
-            if (_bodyDocument.TryBuildInline(key, () => MailBodyDocumentFactory.Build(detail, options)))
+            if (_bodyDocument.TryBuildInline(key, () => MailBodyAuditLog.Build(detail, options)))
             {
                 OnPropertyChanged(nameof(BodyHtmlDocument));
                 OnPropertyChanged(nameof(ShowRemoteImagesPrompt));
@@ -1068,7 +1068,7 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task BuildBodyDocumentAsync(EmailDetail detail, MailDocumentOptions options, string key)
     {
         // 结果回到界面线程后才赋值；被更新的请求取代时 BuildAsync 返回 false，不刷新界面
-        if (!await _bodyDocument.BuildAsync(key, () => MailBodyDocumentFactory.Build(detail, options)).ConfigureAwait(true))
+        if (!await _bodyDocument.BuildAsync(key, () => MailBodyAuditLog.Build(detail, options)).ConfigureAwait(true))
             return;
 
         OnPropertyChanged(nameof(BodyHtmlDocument));

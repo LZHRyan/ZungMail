@@ -115,17 +115,60 @@ public static partial class HtmlMailDocumentBuilder
 
     // ---------------- 文档片段 ----------------
 
+    /// <summary>
+    /// 取正文片段。
+    ///
+    /// 完整文档走 DOM 解析，而不是「从 &lt;body&gt; 到第一个 &lt;/body&gt;」的正则：真实邮件里
+    /// 脏 HTML 很常见——正文写在 &lt;body&gt; 之前、写在 &lt;/body&gt; 之后、body 标签重复或没闭合。
+    /// 正则只认第一种闭区间，前面那段会被整块丢掉（实测一封「Re: Re:」邮件开头新写的话没了、
+    /// 只剩下面的引用历史，看上去像对方没回复）。HTML5 解析器会把这些游离内容收回 body，
+    /// 乱序标签也会就地补全，正文一个字都不会少。
+    /// </summary>
     private static string ExtractBodyFragment(string html)
     {
         if (string.IsNullOrWhiteSpace(html)) return string.Empty;
 
-        var body = BodyRegex().Match(html);
-        if (body.Success) return body.Groups[1].Value.Trim();
+        if (LooksLikeDocument(html) && TryExtractWithDom(html, out var fragment)) return fragment;
 
-        var fragment = HeadRegex().Replace(html, " ");
-        fragment = DoctypeRegex().Replace(fragment, " ");
-        fragment = HtmlTagRegex().Replace(fragment, " ");
-        return fragment.Trim();
+        var body = BodyRegex().Match(html);
+        if (body.Success)
+        {
+            var inner = body.Groups[1].Value.Trim();
+            if (inner.Length > 0) return inner;
+        }
+
+        var stripped = HeadRegex().Replace(html, " ");
+        stripped = DoctypeRegex().Replace(stripped, " ");
+        stripped = HtmlTagRegex().Replace(stripped, " ");
+        return stripped.Trim();
+    }
+
+    /// <summary>是否像完整文档：只有带 html/body 标签的输入才值得花一次 DOM 解析。</summary>
+    private static bool LooksLikeDocument(string html)
+        => html.Contains("<body", StringComparison.OrdinalIgnoreCase)
+           || html.Contains("<html", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>用 HTML5 解析器取 body 内容；解析不出正文时返回 false，由调用方退回字符串路径。</summary>
+    private static bool TryExtractWithDom(string html, out string fragment)
+    {
+        fragment = string.Empty;
+        try
+        {
+            var document = new HtmlParser().ParseDocument(html);
+            var body = document.Body;
+            if (body is null) return false;
+
+            var inner = body.InnerHtml.Trim();
+            if (inner.Length == 0) return false;
+
+            fragment = inner;
+            return true;
+        }
+        catch (Exception)
+        {
+            // 解析器极少抛异常（容错很强）：真出了就让正则兜底，正文宁可少几个样式属性也不能整封空白
+            return false;
+        }
     }
 
     /// <summary>
