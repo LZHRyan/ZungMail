@@ -101,6 +101,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="46" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -295,9 +296,77 @@
                 </StackPanel>
             </Border>
 
+            <!-- 草稿恢复卡片：打开写信窗口时如果发现上次未发送的草稿，就在这里提示。
+                 不做模态确认——用户想继续空白写就直接写，想恢复再点按钮。 -->
+            <Border Grid.Row="2"
+                    Grid.Column="0"
+                    Margin="18,10,18,0"
+                    Padding="12,9"
+                    CornerRadius="8"
+                    Background="{DynamicResource AccentSoftBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="1"
+                    Visibility="{Binding ShowDraftRecoveryCard, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Path Grid.Column="0"
+                          Style="{StaticResource IconPathSmall}"
+                          Data="{StaticResource IcoMail}"
+                          Stroke="{DynamicResource AccentBrush}"
+                          VerticalAlignment="Center" />
+
+                    <StackPanel Grid.Column="1" Margin="9,0,10,0" VerticalAlignment="Center">
+                        <TextBlock Text="发现上次未发送的草稿"
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource InkBrush}" />
+                        <TextBlock Text="{Binding DraftRecoveryDescription}"
+                                   Margin="0,2,0,0"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Ink2Brush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Button Grid.Column="2"
+                            Style="{StaticResource BtnPrimary}"
+                            Height="26"
+                            Padding="10,0"
+                            VerticalAlignment="Center"
+                            Content="恢复到编辑器"
+                            ToolTip="把这封草稿的收件人、主题、正文与附件填回编辑器"
+                            Command="{Binding RestoreRecoveredDraftCommand}" />
+                    <Button Grid.Column="3"
+                            Style="{StaticResource Btn}"
+                            Height="26"
+                            Padding="10,0"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            Content="从空白写"
+                            ToolTip="不恢复这份草稿；草稿仍保存在本机，下次打开写信窗口还会提示"
+                            Command="{Binding DismissDraftRecoveryCommand}" />
+                    <Button Grid.Column="4"
+                            Style="{StaticResource IconBtn}"
+                            Width="24"
+                            Height="24"
+                            Margin="6,0,0,0"
+                            VerticalAlignment="Center"
+                            ToolTip="收起这条提示（草稿保留）"
+                            Command="{Binding DismissDraftRecoveryCommand}">
+                        <Path Style="{StaticResource IconPathSmall}" Data="{StaticResource IcoClose}" />
+                    </Button>
+                </Grid>
+            </Border>
+
             <!-- 正文：富文本编辑器（工具栏、查找替换、右键菜单均在编辑器页面内） -->
             <ct:RichTextEditor x:Name="Editor"
-                               Grid.Row="2"
+                               Grid.Row="3"
                                Html="{Binding BodyHtml, Mode=TwoWay}"
                                IsDark="{Binding IsDark}"
                                Signature="{Binding SignatureHtml}"
@@ -305,7 +374,7 @@
                                FontSize="14" />
 
             <!-- 附件条 -->
-            <Border Grid.Row="3"
+            <Border Grid.Row="4"
                     BorderBrush="{DynamicResource RuleBrush}"
                     BorderThickness="0,1,0,0"
                     Padding="18,10"
@@ -321,7 +390,7 @@
 
             <!-- 右侧可折叠侧栏：快速文本（双击追加到光标处）/ 地址簿（双击加入收件人） -->
             <Border Grid.Row="1"
-                    Grid.RowSpan="3"
+                    Grid.RowSpan="4"
                     Grid.Column="1"
                     Width="276"
                     Background="{DynamicResource SidebarBrush}"
@@ -509,7 +578,7 @@
             </Border>
 
             <!-- 底部操作栏 -->
-            <Border Grid.Row="4"
+            <Border Grid.Row="5"
                     Grid.ColumnSpan="2"
                     Background="{DynamicResource ChromeBrush}"
                     BorderBrush="{DynamicResource RuleBrush}"

@@ -180,6 +180,18 @@ public sealed partial class ComposeViewModel : ObservableObject
     [ObservableProperty] private string _selectedQuickTextCategory = AllQuickTextCategories;
     [ObservableProperty] private string _contactFilter = "";
 
+    /// <summary>
+    /// 上次未发送的草稿：不再用模态确认框逼用户当场选，改成编辑区顶部一张可忽略的卡片，
+    /// 想恢复再点「恢复到编辑器」。
+    /// </summary>
+    private ComposeDraft? _pendingDraft;
+
+    /// <summary>草稿恢复卡片是否显示（打开写信窗口时发现草稿即为 true，用户处理后收起）。</summary>
+    [ObservableProperty] private bool _showDraftRecoveryCard;
+
+    /// <summary>卡片上的说明：保存时间 + 主题 + 附件情况。</summary>
+    [ObservableProperty] private string _draftRecoveryDescription = "";
+
     /// <summary>侧栏「地址簿」Tab 是否选中；写入 true 时切回地址簿。</summary>
     public bool IsAddressBookTabActive
     {
@@ -420,7 +432,10 @@ public sealed partial class ComposeViewModel : ObservableObject
         }
     }
 
-    /// <summary>打开写信窗口时提示恢复上一次未发送的草稿。</summary>
+    /// <summary>
+    /// 打开写信窗口时找一找上一次未发送的草稿：只把卡片显示出来，不动用户正在写的正文，
+    /// 要不要恢复由用户自己点（原来是模态确认框，必须先选一个才能继续）。
+    /// </summary>
     private async Task TryRestoreDraftAsync()
     {
         try
@@ -429,42 +444,57 @@ public sealed partial class ComposeViewModel : ObservableObject
             var latest = drafts.FirstOrDefault();
             if (latest is null) return;
 
+            _pendingDraft = latest;
+
             var savedAt = DisplayFormat.FullDate(latest.UpdatedUtc);
             var subject = string.IsNullOrWhiteSpace(latest.Subject) ? "（无主题）" : latest.Subject;
-            var confirm = _dialogs.Confirm(
-                "恢复未发送的草稿",
-                $"发现一份 {savedAt} 保存的草稿：{subject}",
-                "恢复草稿",
-                detail: "草稿只保存在本机。选择「取消」则从空白开始，草稿仍保留。",
-                icon: DialogIcon.Question);
-
-            if (!confirm) return;
-
-            To = latest.To;
-            Cc = latest.Cc;
-            Bcc = latest.Bcc;
-            Subject = latest.Subject;
-            BodyHtml = latest.BodyHtml;
-            if (!string.IsNullOrWhiteSpace(latest.Cc) || !string.IsNullOrWhiteSpace(latest.Bcc)) ShowCcBcc = true;
-
-            Attachments.Clear();
-            var missing = 0;
-            foreach (var path in latest.Attachments)
-            {
-                if (File.Exists(path)) Attachments.Add(new ComposeAttachment(path));
-                else missing++;
-            }
-
-            _draftId = latest.Id;
-            _draftSignature = BuildSignature();
-            StatusText = missing == 0
-                ? "已恢复上次未发送的草稿"
-                : $"已恢复草稿，其中 {missing} 个附件已不存在，请重新添加";
+            var attachments = latest.Attachments.Count == 0 ? "" : $" · {latest.Attachments.Count} 个附件";
+            DraftRecoveryDescription = $"{savedAt} 保存{attachments} · {subject}";
+            ShowDraftRecoveryCard = true;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "恢复草稿失败");
+            _logger.LogWarning(ex, "查找上次草稿失败");
         }
+    }
+
+    /// <summary>把草稿恢复到编辑器（点卡片上的「恢复到编辑器」）。</summary>
+    [RelayCommand]
+    private void RestoreRecoveredDraft()
+    {
+        if (_pendingDraft is not { } latest) return;
+
+        To = latest.To;
+        Cc = latest.Cc;
+        Bcc = latest.Bcc;
+        Subject = latest.Subject;
+        BodyHtml = latest.BodyHtml;
+        if (!string.IsNullOrWhiteSpace(latest.Cc) || !string.IsNullOrWhiteSpace(latest.Bcc)) ShowCcBcc = true;
+
+        Attachments.Clear();
+        var missing = 0;
+        foreach (var path in latest.Attachments)
+        {
+            if (File.Exists(path)) Attachments.Add(new ComposeAttachment(path));
+            else missing++;
+        }
+
+        _draftId = latest.Id;
+        _draftSignature = BuildSignature();
+        _pendingDraft = null;
+        ShowDraftRecoveryCard = false;
+        StatusText = missing == 0
+            ? "已恢复上次未发送的草稿"
+            : $"已恢复草稿，其中 {missing} 个附件已不存在，请重新添加";
+    }
+
+    /// <summary>不恢复这份草稿：收起卡片，草稿仍留在本机（下次打开写信窗口还会提示）。</summary>
+    [RelayCommand]
+    private void DismissDraftRecovery()
+    {
+        _pendingDraft = null;
+        ShowDraftRecoveryCard = false;
+        StatusText = "已从空白开始写；上次的草稿仍保存在本机";
     }
 
     private void StartAutoSave()
