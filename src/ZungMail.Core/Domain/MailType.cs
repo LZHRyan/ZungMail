@@ -132,10 +132,16 @@ public static class MailTypes
     }
 }
 
-/// <summary>一次类型识别的结果：类型 + 命中强度（用于界面上弱化低置信度结果）。</summary>
-public sealed record MailTypeResult(MailType Type, int Score)
+/// <summary>
+/// 一次类型识别的结果：类型 + 命中强度（用于界面上弱化低置信度结果）+ 判定依据
+/// （<see cref="Services.MailTypeClassifier"/> 产出的 <c>key:词@位置</c> / <c>thread:inherit</c>）。
+/// </summary>
+public sealed record MailTypeResult(MailType Type, int Score, string Basis = "")
 {
     public static MailTypeResult Unknown { get; } = new(MailType.Unknown, 0);
+
+    /// <summary>依据的界面文案；空串表示没有依据可展示。</summary>
+    public string BasisText => Services.MailTypeClassifier.DescribeBasis(Basis);
 
     public bool IsKnown => Type != MailType.Unknown;
 

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ZungMail.App.Services;
@@ -67,6 +70,15 @@ public sealed partial class MailRow : ObservableObject
     /// <summary>设置里「货代 → 邮件类型」关闭后，列表不再显示异常角标。</summary>
     [ObservableProperty]
     private bool _industryTypeVisible = true;
+
+    /// <summary>箱型箱量徽标（`1×40HC`）：来自运输字段抽取，按页加载后填。</summary>
+    [ObservableProperty]
+    private string _boxesText = "";
+
+    /// <summary>是否有箱型箱量可显示（空串表示这封没有）。</summary>
+    public bool HasBoxes => BoxesText.Length > 0;
+
+    partial void OnBoxesTextChanged(string value) => OnPropertyChanged(nameof(HasBoxes));
 
     /// <summary>列表角标的可见性：既是异常邮件，且用户没有关掉邮件类型识别。</summary>
     public bool ShowExceptionBadge => IsExceptionMail && IndustryTypeVisible;
@@ -144,7 +156,83 @@ public sealed partial class MailRow : ObservableObject
 
     public bool HasTags => Tags.Count > 0;
 
-    partial void OnTagsChanged(IReadOnlyList<MailTag> value) => OnPropertyChanged(nameof(HasTags));
+    /// <summary>只有一个标签：行内直接用「实心标签色底 + 白字」的原胶囊样式。</summary>
+    public bool HasSingleTag => Tags.Count == 1;
+
+    /// <summary>多个标签：中性胶囊 + 每个名字用自己的标签色（单一底色盖不住多种颜色）。</summary>
+    public bool HasMultipleTags => Tags.Count > 1;
+
+    /// <summary>单标签时的名字与颜色（供实心胶囊使用）。</summary>
+    public string SingleTagName => Tags.Count > 0 ? Tags[0].Name : "";
+
+    public string SingleTagColor => Tags.Count > 0 ? Tags[0].Color : "#64748b";
+
+    /// <summary>行内最多显示几个标签名；超出的折叠成 `…`（完整列表在整行悬停提示里）。</summary>
+    private const int MaxInlineTags = 3;
+
+    /// <summary>
+    /// 行内标签的一个色段：名字 + 自身标签色 + 该段的圆角。
+    /// 首段左端半圆、末段右端半圆（高 22 → 圆角 11），中间段是直角，拼起来就是一粒完整胶囊。
+    /// </summary>
+    public sealed record TagPiece(string Name, string Color, System.Windows.CornerRadius Corner);
+
+    /// <summary>
+    /// 行内标签色段：一粒胶囊按标签个数分段着色，每段用自己的标签色、白字，段与段之间靠颜色变化分隔。
+    /// 超过 <see cref="MaxInlineTags"/> 个时追加一个灰色的 `…` 段。
+    /// </summary>
+    public IReadOnlyList<TagPiece> TagPieces { get; private set; } = Array.Empty<TagPiece>();
+
+    /// <summary>摘要文本（不带颜色），供悬停提示与测试使用：`客户、紧急、待付款`。</summary>
+    public string TagSummary => Tags.Count == 0
+        ? ""
+        : string.Join("、", Tags.Select(tag => tag.Name));
+
+    private void RebuildTagPieces()
+    {
+        if (Tags.Count == 0)
+        {
+            TagPieces = Array.Empty<TagPiece>();
+            return;
+        }
+
+        var shown = Tags.Take(MaxInlineTags).ToList();
+        var total = shown.Count + (Tags.Count > MaxInlineTags ? 1 : 0);
+        var pieces = new List<TagPiece>(total);
+
+        for (var i = 0; i < shown.Count; i++)
+        {
+            pieces.Add(new TagPiece(shown[i].Name, shown[i].Color, CornerOf(i, total)));
+        }
+
+        if (Tags.Count > MaxInlineTags)
+        {
+            pieces.Add(new TagPiece("…", "#94a3b8", CornerOf(total - 1, total)));
+        }
+
+        TagPieces = pieces;
+    }
+
+    /// <summary>胶囊两端的半圆只给首段左角与末段右角，其余角为直角（半径 = 胶囊高度 26 的一半）。</summary>
+    private static System.Windows.CornerRadius CornerOf(int index, int total)
+    {
+        const double radius = 13;
+        var left = index == 0 ? radius : 0;
+        var right = index == total - 1 ? radius : 0;
+        return new System.Windows.CornerRadius(left, right, right, left);
+    }
+
+    partial void OnTagsChanged(IReadOnlyList<MailTag> value)
+    {
+        RebuildTagPieces();
+        OnPropertyChanged(nameof(HasTags));
+        OnPropertyChanged(nameof(HasSingleTag));
+        OnPropertyChanged(nameof(HasMultipleTags));
+        OnPropertyChanged(nameof(SingleTagName));
+        OnPropertyChanged(nameof(SingleTagColor));
+        OnPropertyChanged(nameof(TagPieces));
+        OnPropertyChanged(nameof(TagSummary));
+        OnPropertyChanged(nameof(RowTooltip));
+    }
 
     /// <summary>该邮件识别出的货代业务单号（按业务优先级排序）。</summary>
     [ObservableProperty]
@@ -170,6 +258,29 @@ public sealed partial class MailRow : ObservableObject
         OnPropertyChanged(nameof(ReferenceDisplay));
         OnPropertyChanged(nameof(ReferenceColor));
         OnPropertyChanged(nameof(ReferenceTooltip));
+        OnPropertyChanged(nameof(RowTooltip));
+    }
+
+    /// <summary>
+    /// 整行合并成一段悬停提示：原来行内挂了 4 个数据绑定 ToolTip，
+    /// 一页 500 行就是 2000 个事件钩子；合并后只留容器上这一个，内容一次算好。
+    /// </summary>
+    public string RowTooltip
+    {
+        get
+        {
+            var lines = new List<string> { $"{From} <{Model.FromEmail}>  ·  {Date}" };
+
+            if (ReferenceTooltip.Length > 0) lines.Add(ReferenceTooltip);
+            if (BoxesText.Length > 0) lines.Add("箱型 " + BoxesText);
+            if (HasTags) lines.Add("标签：" + string.Join("、", Tags.Select(tag => tag.Name)));
+            if (HasIndustryType) lines.Add(Model.IndustryTypeHint);
+            if (PhishingHint.Length > 0) lines.Add(PhishingHint);
+            if (BounceHint.Length > 0) lines.Add(BounceHint);
+            if (IsStranger) lines.Add(StrangerHint);
+
+            return string.Join(Environment.NewLine, lines);
+        }
     }
 
     partial void OnThreadCountChanged(int value) => OnPropertyChanged(nameof(IsThread));

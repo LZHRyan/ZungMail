@@ -33,6 +33,12 @@ public static class ImapFailure
             || message.Contains("cannot move", StringComparison.OrdinalIgnoreCase)
             || message.Contains("can not move", StringComparison.OrdinalIgnoreCase)
             || message.Contains("invalid uids", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("no such message", StringComparison.OrdinalIgnoreCase);
+            || message.Contains("no such message", StringComparison.OrdinalIgnoreCase)
+            // 实测 QQ / 163 的 MOVE 拒绝原文：`Mails not exist, maybe already deleted or filtered`
+            || message.Contains("mails not exist", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("message not exist", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("already deleted", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("deleted or filtered", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("not found", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -33,7 +33,8 @@ public sealed class BounceUiTests
         Assert.True(stranger > 0, "列表缺少「陌生」角标");
         Assert.True(bounce < stranger, "「退信」角标应排在「陌生」之前");
         Assert.Contains("BounceBadgeVisible", xaml);
-        Assert.Contains("BounceHint", xaml);
+        // 角标自身的 ToolTip 已合并进整行提示（MailRow.RowTooltip）：这里守住「列表不再各挂 BounceHint」
+        Assert.DoesNotContain("ToolTip=\"{Binding BounceHint}\"", xaml);
     }
 
     [Fact]

@@ -104,7 +104,7 @@ public static class FreightReferenceExtractor
         CaseSensitive);
 
     /// <summary>常见港口 UN/LOCODE，命中即视为港口（避免任意 5 位大写串误报）。</summary>
-    private static readonly IReadOnlyDictionary<string, string> KnownPorts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, string> KnownPortsInternal = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["CNSHA"] = "上海", ["CNNGB"] = "宁波", ["CNSZX"] = "深圳", ["CNNSA"] = "南沙",
         ["CNTAO"] = "青岛", ["CNXMN"] = "厦门", ["CNTSN"] = "天津", ["CNDLC"] = "大连",
@@ -134,6 +134,12 @@ public static class FreightReferenceExtractor
         ["ARBUE"] = "布宜诺斯艾利斯", ["CLVAP"] = "瓦尔帕莱索", ["PECLL"] = "卡亚俄",
         ["AUSYD"] = "悉尼", ["AUMEL"] = "墨尔本", ["AUBNE"] = "布里斯班", ["NZAKL"] = "奥克兰"
     };
+
+    /// <summary>
+    /// 已知港口（UN/LOCODE → 中文名）。航线对抽取（<see cref="FreightShipmentFieldExtractor"/>）共用这一份词表，
+    /// 避免两处各维护一份导致「同一个港口一处认得、一处不认得」。
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> KnownPorts => KnownPortsInternal;
 
     /// <summary>按「主题优先、正文补充」的顺序抽取，返回按业务优先级排序的标识。</summary>
     public static IReadOnlyList<FreightReference> Extract(string? subject, string? body)
@@ -197,7 +203,7 @@ public static class FreightReferenceExtractor
         Collect(VesselRegex, FreightReferenceKind.VesselVoyage, text, source, found, seen, CleanVessel);
 
         Collect(PortCodeRegex, FreightReferenceKind.Port, text, source, found, seen,
-            value => KnownPorts.ContainsKey(value) ? FormatPort(value) : null);
+            value => KnownPortsInternal.ContainsKey(value) ? FormatPort(value) : null);
         Collect(PortLabeledRegex, FreightReferenceKind.Port, text, source, found, seen, CleanPortLabel);
 
         Collect(InvoiceRegex, FreightReferenceKind.Invoice, text, source, found, seen);
@@ -336,7 +342,7 @@ public static class FreightReferenceExtractor
     private static string FormatPort(string code)
     {
         var upper = code.ToUpperInvariant();
-        return KnownPorts.TryGetValue(upper, out var name) ? $"{upper} {name}" : upper;
+        return KnownPortsInternal.TryGetValue(upper, out var name) ? $"{upper} {name}" : upper;
     }
 
     private static string? CleanPortLabel(string raw)

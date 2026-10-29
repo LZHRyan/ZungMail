@@ -884,7 +884,7 @@
 
     <!-- ============ 邮件列表条目 ============ -->
     <Style x:Key="MailListItem" TargetType="ListBoxItem">
-        <Setter Property="Height" Value="88" />
+        <Setter Property="Height" Value="94" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Template">
@@ -933,21 +933,23 @@
     </Style>
 
     <!-- ============ 标签胶囊 ============ -->
-    <!-- 实心高饱和底色 + 白字，固定高度让圆角等于高度一半（=10），两端是真正的半圆 -->
+    <!-- 实心高饱和底色 + 白字；字号 14，固定高度 26、圆角取一半（=13），两端是真正的半圆；最小宽度 64 让它更显眼 -->
     <Style x:Key="TagChip" TargetType="Border">
-        <Setter Property="Height" Value="20" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Padding" Value="11,0" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="MinWidth" Value="64" />
+        <Setter Property="CornerRadius" Value="13" />
+        <Setter Property="Padding" Value="13,0" />
         <Setter Property="Margin" Value="0,0,5,2" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style x:Key="TagChipText" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="FontSize" Value="14" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="White" />
         <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
     </Style>
 
     <!-- ============ 侧栏条目按钮 ============ -->

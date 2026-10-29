@@ -12,7 +12,7 @@ namespace ZungMail.Infrastructure.Storage;
 public sealed class DatabaseInitializer
 {
     /// <summary>当前架构版本；每次结构变更递增，并在 <see cref="Migrations"/> 注册对应步骤。</summary>
-    public const int SchemaVersion = 24;
+    public const int SchemaVersion = 27;
 
     /// <summary>一次性修复：早期版本未落盘 multipart/related 内嵌图片，正文残留 cid: 引用。</summary>
     private const string InlineImageRepairKey = "repair.inline-images.v1";
@@ -303,6 +303,61 @@ WHERE id = COALESCE(
             index.Transaction = tx;
             index.CommandText = "CREATE INDEX IF NOT EXISTS ix_messages_thread_key ON messages(thread_key);";
             index.ExecuteNonQuery();
+        }),
+
+        // 版本 25：类型判定依据。列表/阅读区要能回答「为什么判成这一类」——
+        // 存命中的词与位置（key:提单样本@12）或「继承会话类型」（thread:inherit），只存词不存正文。
+        (25, "MailTypeBasis", static (connection, tx) =>
+        {
+            EnsureColumn(connection, tx, "messages", "mail_type_basis", "TEXT NOT NULL DEFAULT ''");
+        }),
+
+        // 版本 26：运输字段（箱型箱量 / 航线对 / 贸易条款 / 金额）。
+        // 一封邮件一行；`lane_raw` 保留下原写法，供 `lane:` 搜索与回看。
+        (26, "ShipmentFields", static (connection, tx) =>
+        {
+            using var create = connection.CreateCommand();
+            create.Transaction = tx;
+            create.CommandText = """
+CREATE TABLE IF NOT EXISTS message_shipment_fields(
+    email_id   INTEGER PRIMARY KEY,
+    boxes      TEXT NOT NULL DEFAULT '',
+    lane_pol   TEXT NOT NULL DEFAULT '',
+    lane_pod   TEXT NOT NULL DEFAULT '',
+    lane_raw   TEXT NOT NULL DEFAULT '',
+    incoterm   TEXT NOT NULL DEFAULT '',
+    amount     REAL,
+    currency   TEXT NOT NULL DEFAULT '',
+    basis      TEXT NOT NULL DEFAULT '',
+    created_utc TEXT NOT NULL
+);
+""";
+            create.ExecuteNonQuery();
+
+            using var index = connection.CreateCommand();
+            index.Transaction = tx;
+            index.CommandText = "CREATE INDEX IF NOT EXISTS ix_message_shipment_fields_lane ON message_shipment_fields(lane_pol, lane_pod);";
+            index.ExecuteNonQuery();
+        }),
+
+        // 版本 27：10 万封规模的性能索引。
+        // ① 待补扫计数按 body_indexed 取子集；② 会话模式按 (thread_key, date_utc) 覆盖分组，
+        //    避免每页都回表读 10 万行。
+        (27, "PerfIndexes100k", static (connection, tx) =>
+        {
+            using (var scanIndex = connection.CreateCommand())
+            {
+                scanIndex.Transaction = tx;
+                scanIndex.CommandText = "CREATE INDEX IF NOT EXISTS ix_message_ref_scan_body ON message_ref_scan(body_indexed);";
+                scanIndex.ExecuteNonQuery();
+            }
+
+            using (var threadIndex = connection.CreateCommand())
+            {
+                threadIndex.Transaction = tx;
+                threadIndex.CommandText = "CREATE INDEX IF NOT EXISTS ix_messages_thread_date ON messages(thread_key, date_utc DESC);";
+                threadIndex.ExecuteNonQuery();
+            }
         })
     };
 

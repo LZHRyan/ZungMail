@@ -131,7 +131,7 @@ public sealed class AttachmentActionService
     }
 
     /// <summary>附件另存为：把已下载到本地的副本复制到用户指定位置。</summary>
-    public string? Save(AttachmentInfo? attachment)
+    public async Task<string?> SaveAsync(AttachmentInfo? attachment)
     {
         if (attachment is not { IsDownloaded: true } file) return NotDownloadedHint;
 
@@ -145,7 +145,10 @@ public sealed class AttachmentActionService
 
         try
         {
-            File.Copy(file.LocalPath!, dialog.FileName, overwrite: true);
+            // 几十 MB 的附件在 UI 线程整段复制会让窗口直接卡住，复制放线程池
+            var source = file.LocalPath!;
+            var target = dialog.FileName;
+            await Task.Run(() => File.Copy(source, target, overwrite: true)).ConfigureAwait(true);
             return "附件已保存：" + dialog.FileName;
         }
         catch (Exception ex)
@@ -176,7 +179,7 @@ public sealed class AttachmentActionService
     }
 
     /// <summary>把给定邮件的全部非内嵌附件保存到同一目录（重名自动加序号）。</summary>
-    public string? SaveAll(IReadOnlyList<AttachmentInfo> attachments)
+    public async Task<string?> SaveAllAsync(IReadOnlyList<AttachmentInfo> attachments)
     {
         var files = attachments.Where(a => a.IsDownloaded && !a.IsInline).ToList();
         if (files.Count == 0) return "没有可保存的附件";
@@ -184,25 +187,32 @@ public sealed class AttachmentActionService
         var dialog = new OpenFolderDialog { Title = "选择附件保存位置" };
         if (dialog.ShowDialog() != true) return null;
 
-        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var saved = 0;
-        foreach (var file in files)
+        // 整个批次在同一个后台任务里复制：N 个附件不再逐段阻塞 UI，日志仍然逐条记失败
+        var folder = dialog.FolderName;
+        var (saved, total) = await Task.Run(() =>
         {
-            try
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var ok = 0;
+            foreach (var file in files)
             {
-                var name = UniqueFileName(file.FileName, used);
-                File.Copy(file.LocalPath!, Path.Combine(dialog.FolderName, name), overwrite: false);
-                saved++;
+                try
+                {
+                    var name = UniqueFileName(file.FileName, used);
+                    File.Copy(file.LocalPath!, Path.Combine(folder, name), overwrite: false);
+                    ok++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "批量保存附件失败：{Path}", file.LocalPath);
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "批量保存附件失败：{Path}", file.LocalPath);
-            }
-        }
 
-        return saved == files.Count
+            return (ok, files.Count);
+        }).ConfigureAwait(true);
+
+        return saved == total
             ? $"已保存 {saved} 个附件到 {dialog.FolderName}"
-            : $"已保存 {saved} / {files.Count} 个附件，其余失败";
+            : $"已保存 {saved} / {total} 个附件，其余失败";
     }
 
     private static string UniqueFileName(string fileName, HashSet<string> used)

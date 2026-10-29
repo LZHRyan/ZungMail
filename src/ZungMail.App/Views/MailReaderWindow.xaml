@@ -374,6 +374,7 @@
                                     Background="{DynamicResource SidebarBrush}"
                                     BorderBrush="{DynamicResource RuleBrush}"
                                     BorderThickness="1"
+                                    ToolTip="{Binding Detail.IndustryTypeHint}"
                                     Visibility="{Binding Detail.HasIndustryType, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel Orientation="Horizontal">
                                     <Border Width="8"

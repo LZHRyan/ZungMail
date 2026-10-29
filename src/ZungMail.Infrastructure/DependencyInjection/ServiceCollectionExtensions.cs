@@ -133,6 +133,11 @@ public static class ServiceCollectionExtensions
             _ = sp.GetRequiredService<DatabaseInitializer>();
             return new SqliteShipmentRepository(sp.GetRequiredService<SqliteConnectionFactory>());
         });
+        services.AddSingleton<IMailShipmentFieldRepository>(sp =>
+        {
+            _ = sp.GetRequiredService<DatabaseInitializer>();
+            return new SqliteMailShipmentFieldRepository(sp.GetRequiredService<SqliteConnectionFactory>());
+        });
         services.AddSingleton<IMailFollowUpRepository>(sp =>
         {
             _ = sp.GetRequiredService<DatabaseInitializer>();

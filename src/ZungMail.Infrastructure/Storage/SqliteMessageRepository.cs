@@ -16,7 +16,7 @@ public sealed class SqliteMessageRepository : IMessageRepository
         "m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.thread_id, m.subject, m.from_name, m.from_email, " +
         "m.to_json, m.cc_json, m.bcc_json, m.reply_to, m.references_json, m.date_utc, m.preview, m.flags, m.size, " +
         "m.has_attachment, m.body_state, m.body_html, m.body_text, m.eml_path, m.mdn_to, m.mail_type, m.is_stranger, " +
-        "m.is_bounce, m.bounce_recipient, m.bounce_status, m.bounce_detail";
+        "m.is_bounce, m.bounce_recipient, m.bounce_status, m.bounce_detail, m.mail_type_basis";
 
     /// <summary>
     /// 列表 / 会话查询用的列清单：把正文两列换成空串常量。
@@ -28,7 +28,7 @@ public sealed class SqliteMessageRepository : IMessageRepository
         "m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.thread_id, m.subject, m.from_name, m.from_email, " +
         "m.to_json, m.cc_json, m.bcc_json, m.reply_to, m.references_json, m.date_utc, m.preview, m.flags, m.size, " +
         "m.has_attachment, m.body_state, '' AS body_html, '' AS body_text, m.eml_path, m.mdn_to, m.mail_type, m.is_stranger, " +
-        "m.is_bounce, m.bounce_recipient, m.bounce_status, m.bounce_detail";
+        "m.is_bounce, m.bounce_recipient, m.bounce_status, m.bounce_detail, m.mail_type_basis";
 
     // 会话分组键：迁移 v24 起是 messages 上的虚拟生成列（带索引），会话列表分组与回查都能走索引。
     private const string ThreadKey = "m.thread_key";
@@ -62,8 +62,14 @@ public sealed class SqliteMessageRepository : IMessageRepository
     private async Task<PagedResult<EmailSummary>> RunQueryAsync(
         MessageQuery query, bool useFts, string? matchExpr, MailSearchQuery structured, CancellationToken ct)
     {
-        var (joins, where, prms) = BuildFilter(query, useFts, matchExpr, structured);
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+
+        // 统一收件箱这类「按文件夹种类」的筛选：先把 folder_id 列表查出来（folders 表只有几十行），
+        // 再走 m.folder_id IN (…) 用 ix_messages_folder_date；否则计划会退化成「按日期扫全表 + 逐行 JOIN」。
+        var folderIds = await ResolveKindFoldersAsync(connection, query, ct).ConfigureAwait(false);
+        if (folderIds is { Count: 0 }) return PagedResult<EmailSummary>.Empty;
+
+        var (joins, where, prms) = BuildFilter(query, useFts, matchExpr, structured, folderIds);
 
         int total;
         await using (var countCmd = connection.CreateCommand())
@@ -116,8 +122,12 @@ public sealed class SqliteMessageRepository : IMessageRepository
     private async Task<PagedResult<ThreadGroup>> RunThreadsAsync(
         MessageQuery query, bool useFts, string? matchExpr, MailSearchQuery structured, CancellationToken ct)
     {
-        var (joins, where, prms) = BuildFilter(query, useFts, matchExpr, structured);
         await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+
+        var folderIds = await ResolveKindFoldersAsync(connection, query, ct).ConfigureAwait(false);
+        if (folderIds is { Count: 0 }) return PagedResult<ThreadGroup>.Empty;
+
+        var (joins, where, prms) = BuildFilter(query, useFts, matchExpr, structured, folderIds);
 
         int total;
         await using (var countCmd = connection.CreateCommand())
@@ -889,8 +899,37 @@ FROM messages;
 
     // ---------------- 条件拼装 ----------------
 
+    /// <summary>
+    /// 把「文件夹种类」（收件箱 / 已发送 …）解析成具体 folder_id 列表。
+    /// folders 只有几十行，这一次小查询换来主查询能用 (folder_id, date_utc) 索引。
+    /// 未指定 FolderKind 时返回 null（表示不参与）。
+    /// </summary>
+    private static async Task<IReadOnlyList<long>?> ResolveKindFoldersAsync(
+        SqliteConnection connection, MessageQuery query, CancellationToken ct)
+    {
+        if (!query.FolderKind.HasValue) return null;
+        if (query.FolderId.HasValue) return null; // 已指定具体文件夹，不需要再按种类筛选
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = query.AccountId.HasValue
+            ? "SELECT id FROM folders WHERE kind = @kind AND account_id = @account;"
+            : "SELECT id FROM folders WHERE kind = @kind;";
+        command.Parameters.AddWithValue("@kind", (int)query.FolderKind.Value);
+        if (query.AccountId.HasValue) command.Parameters.AddWithValue("@account", query.AccountId.Value);
+
+        var ids = new List<long>();
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            ids.Add(reader.GetInt64(0));
+        }
+
+        return ids;
+    }
+
     private static (string Joins, string Where, List<(string Name, object? Value)> Params) BuildFilter(
-        MessageQuery query, bool useFts, string? matchExpr, MailSearchQuery structured)
+        MessageQuery query, bool useFts, string? matchExpr, MailSearchQuery structured,
+        IReadOnlyList<long>? kindFolderIds = null)
     {
         var joins = "JOIN folders f ON f.id = m.folder_id";
         var conditions = new List<string>();
@@ -935,8 +974,54 @@ FROM messages;
         }
         if (query.FolderKind.HasValue)
         {
-            conditions.Add("f.kind = @folderKind");
-            prms.Add(("@folderKind", (int)query.FolderKind.Value));
+            if (kindFolderIds is { Count: > 0 })
+            {
+                // 已解析成具体文件夹：走 ix_messages_folder_date，别让计划退化成全表扫日期索引
+                var names = new List<string>(kindFolderIds.Count);
+                for (var i = 0; i < kindFolderIds.Count; i++)
+                {
+                    var name = "@kindFolder" + i;
+                    names.Add(name);
+                    prms.Add((name, kindFolderIds[i]));
+                }
+
+                conditions.Add($"m.folder_id IN ({string.Join(',', names)})");
+            }
+            else
+            {
+                conditions.Add("f.kind = @folderKind");
+                prms.Add(("@folderKind", (int)query.FolderKind.Value));
+            }
+        }
+        if (structured.ShipmentSize is { } shipmentSize)
+        {
+            conditions.Add("EXISTS (SELECT 1 FROM message_shipment_fields sf WHERE sf.email_id = m.id AND sf.boxes LIKE @shipmentSize)");
+            prms.Add(("@shipmentSize", "%" + shipmentSize + "%"));
+        }
+        if (structured.ShipmentLane is { } shipmentLane)
+        {
+            conditions.Add(
+                "EXISTS (SELECT 1 FROM message_shipment_fields sf WHERE sf.email_id = m.id " +
+                "AND (sf.lane_pol LIKE @shipmentLane OR sf.lane_pod LIKE @shipmentLane OR sf.lane_raw LIKE @shipmentLane))");
+            prms.Add(("@shipmentLane", "%" + shipmentLane + "%"));
+        }
+        if (structured.Incoterm is { } incoterm)
+        {
+            conditions.Add("EXISTS (SELECT 1 FROM message_shipment_fields sf WHERE sf.email_id = m.id AND sf.incoterm = @incoterm)");
+            prms.Add(("@incoterm", incoterm));
+        }
+        if (structured.PriceText is { } priceText)
+        {
+            if (decimal.TryParse(priceText, out var minAmount))
+            {
+                conditions.Add("EXISTS (SELECT 1 FROM message_shipment_fields sf WHERE sf.email_id = m.id AND sf.amount >= @minAmount)");
+                prms.Add(("@minAmount", (double)minAmount));
+            }
+            else
+            {
+                conditions.Add("EXISTS (SELECT 1 FROM message_shipment_fields sf WHERE sf.email_id = m.id AND sf.currency = @currency)");
+                prms.Add(("@currency", priceText.ToUpperInvariant()));
+            }
         }
         if (query.TagId.HasValue)
         {
@@ -1163,7 +1248,8 @@ FROM messages;
         IsBounce = SqlConvert.Bool(reader, 26),
         BounceRecipient = SqlConvert.Str(reader, 27),
         BounceStatus = SqlConvert.Str(reader, 28),
-        BounceDetail = SqlConvert.Str(reader, 29)
+        BounceDetail = SqlConvert.Str(reader, 29),
+        IndustryTypeBasis = SqlConvert.Str(reader, 30)
     };
 
     private static EmailDetail MapDetail(SqliteDataReader reader)
@@ -1197,7 +1283,8 @@ FROM messages;
             IsBounce = SqlConvert.Bool(reader, 26),
             BounceRecipient = SqlConvert.Str(reader, 27),
             BounceStatus = SqlConvert.Str(reader, 28),
-            BounceDetail = SqlConvert.Str(reader, 29)
+            BounceDetail = SqlConvert.Str(reader, 29),
+            IndustryTypeBasis = SqlConvert.Str(reader, 30)
         };
 
         var replyTo = SqlConvert.Str(reader, 12);

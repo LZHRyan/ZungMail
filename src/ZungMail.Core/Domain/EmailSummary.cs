@@ -37,6 +37,12 @@ public class EmailSummary
     public MailType IndustryType { get; set; } = MailType.Unknown;
 
     /// <summary>
+    /// 类型判定依据（<c>key:提单样本@12</c> / <c>thread:inherit</c> / 空）。
+    /// 只记录命中的词与位置，不含正文片段。
+    /// </summary>
+    public string IndustryTypeBasis { get; set; } = "";
+
+    /// <summary>
     /// 陌生发件人：入库时该地址既不在通讯录、也没有更早的来信（判定见 <c>StrangerSenderPolicy</c>）。
     /// 结论在收信那一刻固化，之后不再变化；存量邮件与全量重同步一律为 false。
     /// </summary>
@@ -96,6 +102,39 @@ public class EmailSummary
     public string IndustryTypeLabel => MailTypes.LabelOf(IndustryType);
     public string IndustryTypeShort => MailTypes.ShortOf(IndustryType);
     public string IndustryTypeColor => MailTypes.ColorOf(IndustryType);
+
+    /// <summary>类型徽标的悬停提示：「提单草稿 · 命中『提单样本』（主题第 12 字）」或「提单草稿 · 继承会话类型」。</summary>
+    public string IndustryTypeHint
+    {
+        get
+        {
+            if (!HasIndustryType) return "";
+            var basis = Services.MailTypeClassifier.DescribeBasis(IndustryTypeBasis);
+            return basis.Length == 0 ? IndustryTypeLabel : $"{IndustryTypeLabel} · {basis}";
+        }
+    }
+
+    /// <summary>箱型箱量（`1×40HC;3×20GP`，来自运输字段抽取；空串表示没有）。</summary>
+    public string ShipmentBoxesText { get; set; } = "";
+
+    /// <summary>航线（`宁波 → 符拉迪沃斯托克`）。</summary>
+    public string ShipmentLaneText { get; set; } = "";
+
+    /// <summary>贸易条款（`FOB`）。</summary>
+    public string ShipmentIncoterm { get; set; } = "";
+
+    /// <summary>金额（`300 USD`）。</summary>
+    public string ShipmentAmountText { get; set; } = "";
+
+    /// <summary>是否有任何运输字段（决定详情卡那一行要不要显示）。</summary>
+    public bool HasShipmentFields => ShipmentBoxesText.Length > 0 || ShipmentLaneText.Length > 0
+        || ShipmentIncoterm.Length > 0 || ShipmentAmountText.Length > 0;
+
+    /// <summary>详情卡一行展示：`1×40HC · 宁波 → 符拉迪沃斯托克 · FOB · 300 USD`。</summary>
+    public string ShipmentSummary => string.Join(" · ", new[]
+    {
+        ShipmentBoxesText, ShipmentLaneText, ShipmentIncoterm, ShipmentAmountText
+    }.Where(part => part.Length > 0));
     public bool IsExceptionMail => MailTypes.IsException(IndustryType);
     public string FromDisplay => string.IsNullOrWhiteSpace(FromName) ? FromEmail : FromName;
     public string Initial => DisplayFormat.Initial(FromDisplay);

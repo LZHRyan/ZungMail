@@ -33,13 +33,14 @@ public sealed record FreightReferenceSummary(
     public string LastDisplay => DisplayFormat.RelativeDate(LastUtc);
 }
 
-/// <summary>批量写入项：一封邮件的标识集合、扫描状态与行业类型。</summary>
+/// <summary>批量写入项：一封邮件的标识集合、扫描状态、行业类型与判定依据。</summary>
 public sealed record ReferenceIndexEntry(
     long EmailId,
     bool BodyIndexed,
     IReadOnlyList<FreightReference> References,
     MailType MailType = MailType.Unknown,
-    int MailTypeScore = 0);
+    int MailTypeScore = 0,
+    string MailTypeBasis = "");
 
 /// <summary>
 /// 货代业务标识仓储：保存从邮件中抽取的 Job / SO / B/L / 箱号等单号，
@@ -76,6 +77,12 @@ public interface IMailReferenceRepository
 
     /// <summary>正文更新后把扫描记录标记为「未覆盖正文」，等待后台重扫。</summary>
     Task InvalidateAsync(long emailId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 会话继承：把同一会话里已确定的类型（异常优先、其次多数）补到该会话内仍未识别的邮件上。
+    /// 只改 <c>mail_type = 0</c> 的行，已判定的邮件不会被改写；返回本次补上的邮件数。
+    /// </summary>
+    Task<int> ApplyThreadInheritanceAsync(int maxUpdates = 500, CancellationToken ct = default);
 
     /// <summary>
     /// 清空全部扫描进度，让后台补扫把历史邮件重抽一遍。

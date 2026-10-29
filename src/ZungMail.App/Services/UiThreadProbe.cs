@@ -41,6 +41,16 @@ public static class UiThreadProbe
     /// <summary>包住一段「同步占着 UI 线程」的代码，释放时按耗时写日志。非 UI 线程调用直接空转。</summary>
     public static IDisposable Measure(string stage) => new StageScope(stage);
 
+    /// <summary>
+    /// 补记一段「跨等待的界面成本」（例如「填行 → 布局 + 渲染完成」这种中间隔着 Dispatcher 的阶段）。
+    /// 与 <see cref="Measure"/> 同一套阈值：≥50ms 记 Info，≥100ms 记 Warning。
+    /// </summary>
+    public static void Record(string stage, long elapsedMs)
+    {
+        if (elapsedMs < InfoThresholdMs) return;
+        Log($"界面阶段 {stage} ~{elapsedMs}ms", elapsedMs);
+    }
+
     /// <summary>启动心跳：没被 <see cref="Measure"/> 包住的同步占用，靠心跳迟到兜底发现。</summary>
     public static void Attach(Dispatcher dispatcher)
     {

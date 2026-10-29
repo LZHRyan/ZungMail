@@ -31,6 +31,10 @@ public sealed class ImapFailureTests
     [InlineData("The IMAP server replied to the 'MOVE' command with a 'NO' response: Cannot move the message")]
     [InlineData("Invalid UIDs specified")]
     [InlineData("No such message")]
+    [InlineData("The IMAP server replied to the 'MOVE' command with a 'NO' response: Mails not exist, maybe already deleted or filtered")]
+    [InlineData("message not exist")]
+    [InlineData("Message already deleted")]
+    [InlineData("Not found")]
     public void MOVE被拒为搬不动时算已不在(string message)
         => Assert.True(ImapFailure.IsRejectionAboutMessage(message));
 

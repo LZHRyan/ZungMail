@@ -82,9 +82,22 @@ public sealed class MailSearchQuery
     /// <summary><c>before:2026-10-01</c> / <c>before:today</c>：只保留该时间点之前的邮件。</summary>
     public DateTimeOffset? Before { get; init; }
 
+    /// <summary><c>size:40HC</c>：按箱型箱量过滤（匹配落库的 `1×40HC` 串）。</summary>
+    public string? ShipmentSize { get; init; }
+
+    /// <summary><c>lane:ningbo</c>：按航线过滤，起运/目的与原文写法都参与匹配。</summary>
+    public string? ShipmentLane { get; init; }
+
+    /// <summary><c>term:FOB</c>：按贸易条款过滤。</summary>
+    public string? Incoterm { get; init; }
+
+    /// <summary><c>price:USD</c> 按币种、<c>price:300</c> 按「金额 ≥ 300」过滤。</summary>
+    public string? PriceText { get; init; }
+
     public bool HasFilters => References.Count > 0 || From is not null || Subject is not null
         || FileName is not null || MailType is not null || HasAttachment || IsUnread is not null || IsStarred is not null
-        || After is not null || Before is not null;
+        || After is not null || Before is not null
+        || ShipmentSize is not null || ShipmentLane is not null || Incoterm is not null || PriceText is not null;
 
     /// <summary>是否有任何可执行条件（自由文本或运算符）。</summary>
     public bool IsEmpty => !HasFilters && FreeText.Length == 0;
@@ -103,6 +116,10 @@ public sealed class MailSearchQuery
         MailType? mailType = null;
         DateTimeOffset? after = null;
         DateTimeOffset? before = null;
+        string? shipmentSize = null;
+        string? shipmentLane = null;
+        string? incoterm = null;
+        string? priceText = null;
 
         // 记录被识别为运算符的区间，剩余部分才是自由文本
         var consumed = new List<(int Start, int Length)>();
@@ -170,6 +187,22 @@ public sealed class MailSearchQuery
                 if (MailTypes.TryParseKeyword(value, out var parsedType)) mailType = parsedType;
                 else handled = false;
             }
+            else if (key.Equals("size", StringComparison.OrdinalIgnoreCase) || key == "箱型")
+            {
+                shipmentSize = value;
+            }
+            else if (key.Equals("lane", StringComparison.OrdinalIgnoreCase) || key == "航线")
+            {
+                shipmentLane = value;
+            }
+            else if (key.Equals("term", StringComparison.OrdinalIgnoreCase) || key == "条款")
+            {
+                incoterm = value.ToUpperInvariant();
+            }
+            else if (key.Equals("price", StringComparison.OrdinalIgnoreCase) || key == "金额")
+            {
+                priceText = value;
+            }
             else
             {
                 handled = false;
@@ -190,7 +223,11 @@ public sealed class MailSearchQuery
             IsUnread = isUnread,
             IsStarred = isStarred,
             After = after,
-            Before = before
+            Before = before,
+            ShipmentSize = shipmentSize,
+            ShipmentLane = shipmentLane,
+            Incoterm = incoterm,
+            PriceText = priceText
         };
     }
 

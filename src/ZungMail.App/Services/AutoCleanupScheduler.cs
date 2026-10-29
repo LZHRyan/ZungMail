@@ -39,6 +39,9 @@ public sealed class AutoCleanupScheduler : BackgroundService
         // 首轮里的 DB 调用是「假异步」（同步完成），会占住调用 Host.StartAsync 的线程；先让出调度器
         await Task.Yield();
 
+        // 启动错峰：别和首屏那三条查询抢库（写事务会挡住列表读）
+        await StartupDelay.WaitAsync(TimeSpan.FromSeconds(45), stoppingToken).ConfigureAwait(false);
+
         using var timer = new PeriodicTimer(TickInterval);
 
         try

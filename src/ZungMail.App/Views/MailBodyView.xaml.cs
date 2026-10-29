@@ -50,6 +50,9 @@ public partial class MailBodyView : UserControl
     /// <summary>NavigateToString 会以 data:text/html 触发导航；按待处理计数放行自身导航。</summary>
     private int _pendingSelfNavigations;
 
+    /// <summary>大正文「异步写盘 → 导航」的版本号：写完时若已换邮件就丢弃这次结果。</summary>
+    private int _renderVersion;
+
     /// <summary>降级文档重建已排队，避免正文与图片列表连续变更时重复解码。</summary>
     private bool _plainDocumentQueued;
 
@@ -507,9 +510,10 @@ public partial class MailBodyView : UserControl
             // 超过 NavigateToString 的 2MB 上限：写文件后按 URL 导航，避免每次都抛异常再退回纯文本
             if (_bodyDirectory is not null && MailBodyRenderPolicy.NeedsFileNavigation(document))
             {
-                var url = WriteBodyFile(document);
-                _pendingSelfNavigations++;
-                Browser.CoreWebView2.Navigate(url);
+                // 几 MB 的正文同步写盘会让这一帧明显卡顿；写文件放线程池，写完再用版本号确认没换邮件
+                var version = ++_renderVersion;
+                var write = WriteBodyFileAsync(document);
+                _ = FinishFileNavigationAsync(write, version);
                 return;
             }
 
@@ -524,17 +528,37 @@ public partial class MailBodyView : UserControl
         }
     }
 
+    /// <summary>等大正文写完再导航；期间若已切换到别的邮件（版本号变了）就丢弃这次结果。</summary>
+    private async Task FinishFileNavigationAsync(Task<string> write, int version)
+    {
+        try
+        {
+            var url = await write.ConfigureAwait(true);
+            if (version != _renderVersion || _failed) return;
+
+            _pendingSelfNavigations++;
+            Browser.CoreWebView2.Navigate(url);
+        }
+        catch (Exception ex)
+        {
+            Fail(ex);
+        }
+    }
+
     /// <summary>
-    /// 把组装好的文档写成文件并返回虚拟主机地址。
+    /// 把组装好的文档写成文件并返回虚拟主机地址（写盘在线程池执行）。
     /// 同一个控件复用一份文件（每封邮件覆盖写），浏览器缓存用递增查询串绕开，避免临时文件堆积。
     /// </summary>
-    private string WriteBodyFile(string document)
+    private async Task<string> WriteBodyFileAsync(string document)
     {
         _bodyFilePath ??= Path.Combine(_bodyDirectory!, "body-" + Guid.NewGuid().ToString("N") + ".html");
-        File.WriteAllText(_bodyFilePath, document, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var path = _bodyFilePath;
+
+        await Task.Run(() => File.WriteAllText(path, document, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+            .ConfigureAwait(true);
 
         _bodyFileVersion++;
-        return $"https://{BodyVirtualHost}/{Path.GetFileName(_bodyFilePath)}?v={_bodyFileVersion}";
+        return $"https://{BodyVirtualHost}/{Path.GetFileName(path)}?v={_bodyFileVersion}";
     }
 
     private void ApplyBackgroundColor()

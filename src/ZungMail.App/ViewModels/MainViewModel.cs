@@ -38,6 +38,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly MailFollowUpService _followUpService;
     private readonly MailReferenceService _referenceService;
     private readonly IMailReferenceRepository _referenceRepository;
+    private readonly IMailShipmentFieldRepository _shipmentFieldRepository;
     private readonly IShipmentRepository _shipments;
     private readonly SenderFilterService _senderFilters;
     private readonly ClientLockService _clientLock;
@@ -109,6 +110,7 @@ public sealed partial class MainViewModel : ObservableObject
         MailFollowUpService followUpService,
         MailReferenceService referenceService,
         IMailReferenceRepository referenceRepository,
+        IMailShipmentFieldRepository shipmentFieldRepository,
         IShipmentRepository shipments,
         SenderFilterService senderFilters,
         ClientLockService clientLock,
@@ -145,6 +147,7 @@ public sealed partial class MainViewModel : ObservableObject
         _followUpService = followUpService;
         _referenceService = referenceService;
         _referenceRepository = referenceRepository;
+        _shipmentFieldRepository = shipmentFieldRepository;
         _shipments = shipments;
         _senderFilters = senderFilters;
         _clientLock = clientLock;
@@ -714,11 +717,18 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var top = await _referenceService.GetTopAsync(null, 10);
+        // 两条查询都在线程池里做：业务单号 Top 是三表聚合、待补扫计数原本要逐行读 body_text，
+        // 10 万封时单条能到秒级，压在 UI 线程就是一次明显卡顿。
+        var (top, pending) = await Task.Run(async () =>
+        {
+            var topItems = await _referenceService.GetTopAsync(null, 10).ConfigureAwait(false);
+            var pendingCount = await _referenceService.CountPendingAsync().ConfigureAwait(false);
+            return (topItems, pendingCount);
+        });
+
         BusinessRefs.Clear();
         foreach (var item in top) BusinessRefs.Add(item);
 
-        var pending = await _referenceService.CountPendingAsync();
         BusinessRefsSummary = pending > 0 ? $"待补扫 {pending} 封" : "按最近往来排序";
     }
 
@@ -1258,8 +1268,11 @@ public sealed partial class MainViewModel : ObservableObject
             StatusText = "正在统计本地邮件…";
             await LetUiRenderAsync();
 
+            // 归因用：侧栏标签集合重建 + 本地总数统计（含各自的 UI 通知）
+            var statsWatch = System.Diagnostics.Stopwatch.StartNew();
             await ReloadSidebarTagsAsync();
             await RefreshLocalTotalAsync();
+            UiThreadProbe.Record("启动 标签与统计", statsWatch.ElapsedMilliseconds);
             Mark("标签与统计");
             // 存储快照要递归统计整个数据目录（机械盘上实测 60 秒以上），不能挡启动：
             // 放到「就绪」之后后台补，状态栏的数字晚几秒出现，但界面立刻可用。
@@ -2200,7 +2213,13 @@ public sealed partial class MainViewModel : ObservableObject
 
             TotalCount = total;
             // 整批替换：逐条 Add 会给 ListBox 发 500 次通知，每次都要重排
-            Messages.ReplaceAll(rows);
+            using (UiThreadProbe.Measure("列表替换"))
+            {
+                Messages.ReplaceAll(rows);
+            }
+
+            // 归因用：填行到真正绘制完成之间是「行容器 realize + 布局 + 渲染」，跨 Dispatcher，只能用补记
+            var paintWatch = System.Diagnostics.Stopwatch.StartNew();
             StartupTrace.Mark("列表 填行");
 
             IsEmpty = Messages.Count == 0;
@@ -2220,6 +2239,7 @@ public sealed partial class MainViewModel : ObservableObject
 
             await LetUiRenderAsync();
             StartupTrace.Mark("列表上屏");
+            UiThreadProbe.Record("列表填行→上屏（行容器 realize + 布局 + 渲染）", paintWatch.ElapsedMilliseconds);
             FireAndForget.Run(() => LoadRowBadgesAsync(rows, version), "补齐行徽标");
         }
         catch (Exception ex)
@@ -2259,7 +2279,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         try
         {
-            var tagMap = await _tagService.GetForMessagesAsync(ids);
+            // 仓储 *Async 在 Microsoft.Data.Sqlite 上是同步执行：整页按 id 取标签也要切到线程池，
+            // 否则 500 行一页时这段会实打实占住 UI（实测首屏 227ms 未归因占用的一部分）。
+            var tagMap = await Task.Run(() => _tagService.GetForMessagesAsync(ids));
             if (version != _loadVersion) return;
             foreach (var row in rows)
             {
@@ -2284,7 +2306,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         try
         {
-            var refMap = await _referenceRepository.GetForMessagesAsync(ids);
+            var refMap = await Task.Run(() => _referenceRepository.GetForMessagesAsync(ids));
             if (version != _loadVersion) return;
             foreach (var row in rows)
             {
@@ -2295,6 +2317,42 @@ public sealed partial class MainViewModel : ObservableObject
         {
             _logger.LogDebug(ex, "加载业务单号失败");
         }
+
+        // 运输字段：列表只显示箱型箱量（`1×40HC`），关掉货代功能时不查也不显示
+        if (!FreightFlags.AnyRecognition)
+        {
+            foreach (var row in rows)
+            {
+                if (row.BoxesText.Length > 0) row.BoxesText = "";
+            }
+
+            return;
+        }
+
+        try
+        {
+            var fieldMap = await Task.Run(() => _shipmentFieldRepository.GetForMessagesAsync(ids));
+            if (version != _loadVersion) return;
+            foreach (var row in rows)
+            {
+                row.BoxesText = fieldMap.TryGetValue(row.Id, out var fields) && fields.Boxes.Count > 0
+                    ? fields.Boxes[0].Display
+                    : "";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "加载运输字段失败");
+        }
+    }
+
+    /// <summary>把运输字段挂到详情对象上（详情卡一行展示；没有字段时整行不显示）。</summary>
+    private static void ApplyShipmentFields(EmailDetail detail, ShipmentFields fields)
+    {
+        detail.ShipmentBoxesText = string.Join(" / ", fields.Boxes.Select(box => box.Display));
+        detail.ShipmentLaneText = fields.Lane?.Display ?? "";
+        detail.ShipmentIncoterm = fields.Incoterm;
+        detail.ShipmentAmountText = fields.AmountDisplay;
     }
 
     /// <summary>
@@ -2422,6 +2480,25 @@ public sealed partial class MainViewModel : ObservableObject
         {
             _logger.LogDebug(ex, "读取业务单号失败");
             DetailReferences = Array.Empty<FreightReference>();
+        }
+
+        // 运输字段：箱型箱量 / 航线 / 贸易条款 / 金额（详情卡一行展示）
+        try
+        {
+            var fields = await _shipmentFieldRepository.GetForMessageAsync(detail.Id);
+            if (!fields.HasAny && detail.BodyState == BodyState.Downloaded && FreightFlags.AnyRecognition)
+            {
+                // 旧数据还没抽过：用当前正文补一次（写入由索引服务完成），再读回来
+                await _referenceService.IndexMessageAsync(detail);
+                fields = await _shipmentFieldRepository.GetForMessageAsync(detail.Id);
+            }
+
+            ApplyShipmentFields(detail, fields);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "读取运输字段失败");
+            ApplyShipmentFields(detail, ShipmentFields.Empty);
         }
 
         // 时效节点与所属一票货：详情卡直接展示「距截关几小时」与「打开这票货」
@@ -3457,7 +3534,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>附件另存为：把已下载到本地的副本复制到用户指定位置。</summary>
     [RelayCommand]
-    private void SaveAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Save(attachment));
+    private async Task SaveAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(await _attachments.SaveAsync(attachment));
 
     /// <summary>在资源管理器中定位附件文件。</summary>
     [RelayCommand]
@@ -3465,8 +3542,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>把当前邮件的全部非内嵌附件保存到同一目录（重名自动加序号）。</summary>
     [RelayCommand]
-    private void SaveAllAttachments()
-        => ApplyAttachmentStatus(_attachments.SaveAll(Detail?.Attachments ?? new List<AttachmentInfo>()));
+    private async Task SaveAllAttachments()
+        => ApplyAttachmentStatus(await _attachments.SaveAllAsync(Detail?.Attachments ?? new List<AttachmentInfo>()));
 
     /// <summary>往来邮件：直接移至垃圾箱（本地先落库 + 入待同步队列，可在状态栏撤销）。</summary>
     [RelayCommand]
@@ -3936,36 +4013,43 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>
     /// 把后台同步新增的邮件并进当前列表：不重排、不跳页、不动选中行。
     /// 翻到第 2 页、搜索结果、会话视图、单封定位这些场景一律不动列表，避免打断正在阅读的用户。
+    /// <para>
+    /// 只查「比当前首行更新的那几封」而不是整页重查：整页重查要重新映射 100 行、
+    /// 重建 100 个行容器，实测同步中一次 510–1100 ms；这里通常只有 1–5 行。
+    /// 代价是「别处被删 / 被规则挪走」的旧行要等下一次整页加载（切文件夹 / 翻页）才消失。
+    /// </para>
     /// </summary>
     private async Task MergeNewMessagesAsync()
     {
         if (IsSearchResults || CurrentPage > 1 || ConversationMode || _pinnedEmailId is not null) return;
         if (Messages.Count == 0) return;
 
-        var page = await Task.Run(() => _messages.QueryAsync(BuildQuery(0)));
-        var rows = page.Items.Select(summary => new MailRow(summary, avatars: _avatars)).ToList();
-        if (rows.Count == 0) return;
+        // 列表按日期倒序，首行就是当前看到的最新一封；往回退 1 秒，同秒到达的多封也不会漏，去重靠 Id
+        var newest = Messages[0].Model.DateUtc;
+        var query = BuildQuery(0);
+        query.SinceUtc = newest.AddSeconds(-1);
+        query.Take = PageSize;
+
+        var page = await Task.Run(() => _messages.QueryAsync(query));
+        if (page.Items.Count == 0) return;
 
         var existingIds = Messages.Select(row => row.Id).ToHashSet();
-        var queriedIds = rows.Select(row => row.Id).ToHashSet();
-        var missing = rows.Where(row => !existingIds.Contains(row.Id)).ToList();
-        var removed = Messages.Where(row => !queriedIds.Contains(row.Id)).ToList();
-
-        if (missing.Count == 0 && removed.Count == 0)
-        {
-            TotalCount = page.TotalCount;
-            return;
-        }
+        var fresh = page.Items.Where(summary => !existingIds.Contains(summary.Id)).ToList();
+        if (fresh.Count == 0) return;
 
         var selectedId = SelectedRow?.Id;
 
-        foreach (var row in removed) Messages.Remove(row);
-        foreach (var row in missing) InsertRowInOrder(row, rows);
+        // 新邮件一定排在首行之前：整段插到最前面即可，不需要逐行找位置
+        for (var i = fresh.Count - 1; i >= 0; i--)
+        {
+            Messages.Insert(0, new MailRow(fresh[i], avatars: _avatars));
+        }
 
         // 保持「一页多少封」不变：多了就从尾部裁掉，避免列表越滚越长
         while (Messages.Count > PageSize) Messages.RemoveAt(Messages.Count - 1);
 
-        TotalCount = page.TotalCount;
+        // 精确总数要额外一次全量 COUNT；这里按增量累加，下一次整页加载会校正
+        TotalCount += fresh.Count;
         ListSubtitle = (IsSearchResults ? (IsSearchScopeAllMail ? "所有邮件 · " : "当前文件夹 · ") : string.Empty)
                        + $"共 {TotalCount} 封 · 第 {CurrentPage}/{TotalPages} 页";
 
@@ -3974,38 +4058,9 @@ public sealed partial class MainViewModel : ObservableObject
             // 选中的那封已经不在当前视图（比如被规则挪走了）：退回最后一行，避免阅读区留空
             SelectedRow = Messages.Count > 0 ? Messages[^1] : null;
         }
-    }
 
-    /// <summary>按查询顺序把新行插到正确位置（列表与查询结果都是「新邮件在前」）。</summary>
-    private void InsertRowInOrder(MailRow row, IReadOnlyList<MailRow> ordered)
-    {
-        var target = -1;
-        for (var i = 0; i < ordered.Count; i++)
-        {
-            if (ordered[i].Id != row.Id) continue;
-            target = i;
-            break;
-        }
-
-        var insertAt = Messages.Count;
-        for (var i = 0; i < Messages.Count; i++)
-        {
-            var index = -1;
-            for (var j = 0; j < ordered.Count; j++)
-            {
-                if (ordered[j].Id != Messages[i].Id) continue;
-                index = j;
-                break;
-            }
-
-            if (index >= 0 && target >= 0 && index > target)
-            {
-                insertAt = i;
-                break;
-            }
-        }
-
-        Messages.Insert(insertAt, row);
+        // 新行的徽标（标签 / 单号 / 箱型）按页补一次，避免新邮件长时间光秃秃
+        FireAndForget.Run(() => LoadRowBadgesAsync(Messages.Take(fresh.Count).ToList(), _loadVersion), "补齐新行徽标");
     }
 
     // ---------------- 内部工具 ----------------
@@ -4031,6 +4086,9 @@ public sealed partial class MainViewModel : ObservableObject
 
             return (list, counts, map);
         });
+
+        // 归因用：账户树 / 文件夹节点的重建与通知成本（10 万封口径下排查 UI 占用）
+        using var sidebarScope = UiThreadProbe.Measure("侧栏重建");
 
         for (var i = Accounts.Count - 1; i >= 0; i--)
         {

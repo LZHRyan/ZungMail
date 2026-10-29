@@ -36,6 +36,9 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         _readerWindow = readerWindow;
 
+        // 归因用：一页行容器 realize（模板实例化 + 首轮 Measure/Arrange）到底占多少 UI 线程
+        MailList.ItemContainerGenerator.StatusChanged += OnMailContainersGenerated;
+
         // 自绘标题栏按钮依赖系统菜单命令，Window 不会自动注册，必须显式绑定
         WindowChromeCommands.Attach(this);
 
@@ -360,6 +363,30 @@ public partial class MainWindow : Window
         {
             vm.UpdateBatchSelection(MailList.SelectedItems.OfType<MailRow>());
         }
+    }
+
+    /// <summary>行容器 realize 期间的 UI 线程占用（归因用；切页/刷新时各记一次）。</summary>
+    private IDisposable? _containerRealizeScope;
+
+    /// <summary>
+    /// 容器生成完毕后开始计时，等这一轮布局结束（Loaded 优先级回到队列尾部）再收口。
+    /// WPF 的模板实例化 + 首轮 Measure/Arrange 都发生在容器生成之后的同一次布局里，
+    /// 因此这个窗口正好覆盖「一页 100 行到底要多久」。
+    /// </summary>
+    private void OnMailContainersGenerated(object? sender, EventArgs e)
+    {
+        if (MailList.ItemContainerGenerator.Status != GeneratorStatus.ContainersGenerated) return;
+
+        _containerRealizeScope?.Dispose();
+        _containerRealizeScope = UiThreadProbe.Measure("行容器 realize");
+
+        Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                _containerRealizeScope?.Dispose();
+                _containerRealizeScope = null;
+            }),
+            DispatcherPriority.Loaded);
     }
 
     /// <summary>

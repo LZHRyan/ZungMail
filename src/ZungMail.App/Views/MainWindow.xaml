@@ -431,7 +431,8 @@
 
         <!-- 邮件列表行 -->
         <DataTemplate x:Key="MailRowTemplate" DataType="{x:Type vm:MailRow}">
-            <Grid>
+            <!-- 整行一个悬停提示：内容由 MailRow.RowTooltip 一次算好，行内不再各挂 ToolTip -->
+            <Grid ToolTip="{Binding RowTooltip}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="*" />
@@ -457,6 +458,7 @@
                                        Text="{Binding From}"
                                        MaxWidth="176"
                                        FontSize="13"
+                                       FontWeight="SemiBold"
                                        Foreground="{DynamicResource Ink2Brush}"
                                        TextTrimming="CharacterEllipsis" />
                             <Border Background="{DynamicResource BadgeGrayBackgroundBrush}"
@@ -475,7 +477,6 @@
                                     Padding="4,0"
                                     Margin="6,0,0,0"
                                     VerticalAlignment="Center"
-                                    ToolTip="{Binding PhishingHint}"
                                     Visibility="{Binding PhishingBadgeVisible, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="疑似钓鱼"
                                            FontSize="10"
@@ -490,7 +491,6 @@
                                     Padding="4,0"
                                     Margin="6,0,0,0"
                                     VerticalAlignment="Center"
-                                    ToolTip="{Binding BounceHint}"
                                     Visibility="{Binding BounceBadgeVisible, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="退信"
                                            FontSize="10"
@@ -505,7 +505,6 @@
                                     Padding="4,0"
                                     Margin="6,0,0,0"
                                     VerticalAlignment="Center"
-                                    ToolTip="{Binding StrangerHint}"
                                     Visibility="{Binding StrangerBadgeVisible, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="陌生"
                                            FontSize="10"
@@ -522,6 +521,7 @@
                     <Grid Margin="0,3,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Grid Grid.Column="0">
@@ -550,12 +550,27 @@
                                        TextTrimming="CharacterEllipsis" />
                         </Grid>
 
+                        <!-- 箱型箱量：询价/订舱邮件最先要看的量（1×40HC） -->
+                        <Border Grid.Column="1"
+                                Margin="6,0,0,0"
+                                Padding="5,0"
+                                CornerRadius="5"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource SidebarBrush}"
+                                BorderBrush="{DynamicResource RuleBrush}"
+                                BorderThickness="1"
+                                Visibility="{Binding HasBoxes, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding BoxesText}"
+                                       FontSize="10.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource InkBrush}" />
+                        </Border>
+
                         <!-- 货代业务单号：一票货的主键（Job / SO / B/L / 箱号），比主题更可靠 -->
-                        <Grid Grid.Column="1"
+                        <Grid Grid.Column="2"
                               Margin="6,0,0,0"
                               MaxWidth="118"
                               VerticalAlignment="Center"
-                              ToolTip="{Binding ReferenceTooltip}"
                               Visibility="{Binding HasReference, Converter={StaticResource BoolToVisibility}}">
                             <Border CornerRadius="6"
                                     Opacity="0.16"
@@ -577,23 +592,40 @@
                                Margin="0,3,0,0"
                                TextTrimming="CharacterEllipsis" />
 
-                    <ItemsControl ItemsSource="{Binding Tags}"
-                                  Margin="0,3,0,0"
-                                  Visibility="{Binding HasTags, Converter={StaticResource BoolToVisibility}}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <!-- 实心高饱和标签：白字 + 本色底，比原来的半透明描边款更好认 -->
-                                <Border Style="{StaticResource TagChip}"
-                                        Margin="0,0,5,0"
-                                        Background="{Binding Color, Converter={StaticResource HexToBrush}}">
-                                    <TextBlock Style="{StaticResource TagChipText}" Text="{Binding Name}" />
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- 单个标签：沿用原胶囊（实心标签色底 + 白字） -->
+                    <Border Style="{StaticResource TagChip}"
+                            HorizontalAlignment="Left"
+                            Background="{Binding SingleTagColor, Converter={StaticResource HexToBrush}}"
+                            Visibility="{Binding HasSingleTag, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource TagChipText}" Text="{Binding SingleTagName}" />
+                    </Border>
+
+                    <!-- 多个标签：一粒胶囊按标签个数分段着色，每段实心标签色 + 白字（首末段各带半圆角） -->
+                    <Border Height="26"
+                            CornerRadius="13"
+                            HorizontalAlignment="Left"
+                            Visibility="{Binding HasMultipleTags, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl ItemsSource="{Binding TagPieces}" VerticalAlignment="Stretch" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding Color, Converter={StaticResource HexToBrush}}"
+                                            CornerRadius="{Binding Corner}"
+                                            Padding="9,0"
+                                            VerticalAlignment="Stretch">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="14"
+                                                   FontWeight="Bold"
+                                                   Foreground="White"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
                 </StackPanel>
 
                 <Grid Grid.Column="2" Width="34" VerticalAlignment="Center">
@@ -613,7 +645,8 @@
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsUnread}" Value="True">
                     <Setter TargetName="FromText" Property="Foreground" Value="{DynamicResource InkBrush}" />
-                    <Setter TargetName="FromText" Property="FontWeight" Value="SemiBold" />
+                    <!-- 发件人基线已是 SemiBold，未读再进一档才看得出差别 -->
+                    <Setter TargetName="FromText" Property="FontWeight" Value="Bold" />
                     <Setter TargetName="SubjectText" Property="FontWeight" Value="SemiBold" />
                     <Setter TargetName="DateText" Property="Foreground" Value="{DynamicResource AccentBrush}" />
                 </DataTrigger>
@@ -2791,6 +2824,7 @@
                                             Background="{DynamicResource SidebarBrush}"
                                             BorderBrush="{DynamicResource RuleBrush}"
                                             BorderThickness="1"
+                                            ToolTip="{Binding Detail.IndustryTypeHint}"
                                             Visibility="{Binding ShowDetailIndustryType, Converter={StaticResource BoolToVisibility}}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -2817,6 +2851,28 @@
                                                        Foreground="{Binding Detail.IndustryTypeColor, Converter={StaticResource HexToBrush}}"
                                                        Text="{Binding Detail.IndustryTypeLabel}" />
                                         </Grid>
+                                    </Border>
+
+                                    <!-- 运输字段：箱型箱量 / 航线 / 贸易条款 / 金额（规则抽取，数字不改写） -->
+                                    <Border Margin="0,10,0,0"
+                                            Padding="10,7"
+                                            CornerRadius="6"
+                                            Background="{DynamicResource SidebarBrush}"
+                                            BorderBrush="{DynamicResource RuleBrush}"
+                                            BorderThickness="1"
+                                            ToolTip="从主题与正文按规则抽取，原始数字不做改写"
+                                            Visibility="{Binding Detail.HasShipmentFields, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource LabelText}"
+                                                       Text="运输"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding Detail.ShipmentSummary}" />
+                                        </StackPanel>
                                     </Border>
 
                                     <!-- 货代业务信息：主题 / 正文抽取的单号，点击按该单号聚合全库往来邮件 -->

@@ -18,8 +18,16 @@ public sealed class MailReferenceService
 {
     private readonly IMailReferenceRepository _repository;
     private readonly IShipmentRepository _shipments;
+    private readonly IMailShipmentFieldRepository? _shipmentFields;
     private readonly ISettingsStore? _settings;
+    private readonly IAppMetadataStore? _metadata;
     private readonly ILogger<MailReferenceService> _logger;
+
+    /// <summary>类型识别规则升级过一次：用它把存量邮件重新排进补扫队列（只跑一次）。</summary>
+    private const string RecallBackfillKey = "mail_type_recall_v1";
+
+    /// <summary>运输字段首次上线：同样清一次补扫进度，让存量邮件补出箱型/航线/条款/金额。</summary>
+    private const string ShipmentFieldsBackfillKey = "shipment_fields_v1";
 
     /// <summary>单飞标记：后台补扫与正文下载触发的索引不并发执行，避免重复写锁。</summary>
     private int _indexing;
@@ -28,13 +36,43 @@ public sealed class MailReferenceService
         IMailReferenceRepository repository,
         IShipmentRepository shipments,
         ILogger<MailReferenceService> logger,
-        ISettingsStore? settings = null)
+        ISettingsStore? settings = null,
+        IAppMetadataStore? metadata = null,
+        IMailShipmentFieldRepository? shipmentFields = null)
     {
         _repository = repository;
         _shipments = shipments;
         _logger = logger;
         // 设置存储是可选的：只装配 Application 层的单元测试拿不到它，此时按「货代功能全开」处理
         _settings = settings;
+        _metadata = metadata;
+        _shipmentFields = shipmentFields;
+    }
+
+    /// <summary>
+    /// 一次性：识别规则升级后让存量邮件重新排队（清空补扫进度），并立刻跑一批。
+    /// 只有真的写过 meta 键才清进度，避免每次启动都重扫；开关关闭时不动，等开启后再补。
+    /// </summary>
+    public async Task<int> EnsureRecallBackfillAsync(CancellationToken ct = default)
+    {
+        if (_metadata is null || !Flags.AnyRecognition) return 0;
+
+        // 两个一次性的键共用一个「清空补扫进度」动作：清一次就够，谁缺就补谁
+        var needsClear = false;
+        foreach (var key in new[] { RecallBackfillKey, ShipmentFieldsBackfillKey })
+        {
+            if (await _metadata.HasAsync(key, ct).ConfigureAwait(false)) continue;
+
+            needsClear = true;
+            await _metadata.SetAsync(key, DateTimeOffset.UtcNow.ToString("O"), ct).ConfigureAwait(false);
+        }
+
+        if (needsClear)
+        {
+            await _repository.ClearScanProgressAsync(ct).ConfigureAwait(false);
+        }
+
+        return await IndexPendingAsync(500, 20, ct).ConfigureAwait(false);
     }
 
     /// <summary>当前的货代功能开关（总开关关闭时四项都算关；没有设置存储时按全开）。</summary>
@@ -159,11 +197,16 @@ public sealed class MailReferenceService
             ? FreightDeadlineExtractor.Extract(subject, body, date)
             : Array.Empty<FreightDeadline>();
         var type = flags.MailTypes
-            ? MailTypeClassifier.Classify(subject, body)
+            ? MailTypeClassifier.Classify(subject, body, references.Count > 0)
             : MailTypeResult.Unknown;
 
+        // 运输字段（箱型/航线/条款/金额）：纯规则，和单号同一批判定；开关关闭时不抽不写
+        var fields = flags.AnyRecognition
+            ? FreightShipmentFieldExtractor.Extract(subject, body)
+            : ShipmentFields.Empty;
+
         return new ScanEntry(
-            new ReferenceIndexEntry(emailId, bodyIndexed, references, type.Type, type.Score),
+            new ReferenceIndexEntry(emailId, bodyIndexed, references, type.Type, type.Score, type.Basis),
             new ShipmentIndexEntry
             {
                 EmailId = emailId,
@@ -171,7 +214,8 @@ public sealed class MailReferenceService
                 References = references,
                 Deadlines = deadlines,
                 MailType = type.Type
-            });
+            },
+            fields);
     }
 
     private async Task PersistAsync(IReadOnlyList<ScanEntry> entries, CancellationToken ct)
@@ -192,6 +236,25 @@ public sealed class MailReferenceService
             return; // 单号没落库时案件归并也一定对不上，直接跳过
         }
 
+        if (_shipmentFields is not null)
+        {
+            try
+            {
+                await _shipmentFields
+                    .ReplaceRangeAsync(entries.Select(e => new ShipmentFieldEntry(e.Reference.EmailId, e.Fields)).ToList(), ct)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // 运输字段只是展示与检索的增益，写失败不影响单号、类型与案件归并
+                _logger.LogWarning(ex, "写入运输字段失败（{Count} 封）", entries.Count);
+            }
+        }
+
         try
         {
             await _shipments.ApplyAsync(entries.Select(e => e.Shipment).ToList(), ct).ConfigureAwait(false);
@@ -205,7 +268,25 @@ public sealed class MailReferenceService
             // 案件归并失败不应影响邮件入库与单号索引，下次补扫会重建。
             _logger.LogWarning(ex, "归并一票货案件失败（{Count} 封）", entries.Count);
         }
+
+        // 会话继承：同一会话里已确定的类型补到仍未识别的邮件上（异常优先、其次多数）。
+        // 只有本批真的判出了类型才需要跑，避免每批都扫一遍。
+        if (entries.Any(entry => entry.Reference.MailType != MailType.Unknown))
+        {
+            try
+            {
+                await _repository.ApplyThreadInheritanceAsync(ct: ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "会话类型继承失败（已索引 {Count} 封）", entries.Count);
+            }
+        }
     }
 
-    private sealed record ScanEntry(ReferenceIndexEntry Reference, ShipmentIndexEntry Shipment);
+    private sealed record ScanEntry(ReferenceIndexEntry Reference, ShipmentIndexEntry Shipment, ShipmentFields Fields);
 }

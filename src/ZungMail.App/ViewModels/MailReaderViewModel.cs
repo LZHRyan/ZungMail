@@ -665,13 +665,13 @@ public sealed partial class MailReaderViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SaveAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Save(attachment));
+    private async Task SaveAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(await _attachments.SaveAsync(attachment));
 
     [RelayCommand]
     private void RevealAttachment(AttachmentInfo? attachment) => ApplyAttachmentStatus(_attachments.Reveal(attachment));
 
     [RelayCommand]
-    private void SaveAllAttachments() => ApplyAttachmentStatus(_attachments.SaveAll(VisibleAttachments));
+    private async Task SaveAllAttachments() => ApplyAttachmentStatus(await _attachments.SaveAllAsync(VisibleAttachments));
 
     private void ApplyAttachmentStatus(string? message)
     {

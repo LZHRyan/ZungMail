@@ -124,6 +124,8 @@ public sealed class MailReferenceServiceFlagsTests
 
         public int ClearCalls { get; private set; }
 
+        public int InheritanceCalls { get; private set; }
+
         public Task ReplaceRangeAsync(IReadOnlyList<ReferenceIndexEntry> entries, CancellationToken ct = default)
         {
             WrittenEntries.AddRange(entries);
@@ -157,6 +159,12 @@ public sealed class MailReferenceServiceFlagsTests
             => Task.FromResult<IReadOnlyList<FreightReferenceSummary>>(Array.Empty<FreightReferenceSummary>());
 
         public Task<int> CountPendingScansAsync(CancellationToken ct = default) => Task.FromResult(0);
+
+        public Task<int> ApplyThreadInheritanceAsync(int maxUpdates = 500, CancellationToken ct = default)
+        {
+            InheritanceCalls++;
+            return Task.FromResult(0);
+        }
 
         public Task InvalidateAsync(long emailId, CancellationToken ct = default) => Task.CompletedTask;
     }

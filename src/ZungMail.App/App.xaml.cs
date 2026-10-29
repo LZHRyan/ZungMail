@@ -282,6 +282,9 @@ public partial class App : System.Windows.Application
         // 首屏之后才跑（meta 里标记过就秒退），异常只记日志，不影响启动。
         _ = BackfillInlineDataImagesAsync(_host.Services);
 
+        // 一次性回填：类型识别规则升级后，让存量邮件按新规则重扫一遍（meta 键只清一次进度）。
+        _ = BackfillMailTypeRecallAsync(_host.Services);
+
         if (settings.Current.SyncOnLaunch)
         {
             // 启动即增量同步，但不阻塞界面（同步引擎内部在后台线程执行）
@@ -312,6 +315,29 @@ public partial class App : System.Windows.Application
         {
             // 回填失败不影响使用：下次启动会重试（meta 标记只在跑完后才写）
             AppLog.Warn("内嵌图片回填失败（下次启动会重试）：" + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 一次性回填：类型识别规则升级后清空补扫进度，让存量邮件按新规则重判一遍类型与依据。
+    /// meta 键只写一次；开关关闭时直接跳过，等用户开启后再补。
+    /// </summary>
+    private static async Task BackfillMailTypeRecallAsync(IServiceProvider services)
+    {
+        try
+        {
+            await Task.Yield();
+
+            var service = services.GetRequiredService<MailReferenceService>();
+            var processed = await service.EnsureRecallBackfillAsync().ConfigureAwait(false);
+            if (processed > 0)
+            {
+                AppLog.Info($"类型识别回填：本次重扫 {processed} 封");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("类型识别回填失败（下次启动会重试）：" + ex.Message);
         }
     }
 

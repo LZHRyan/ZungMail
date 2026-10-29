@@ -1,5 +1,6 @@
 using ZungMail.Core.Abstractions;
 using ZungMail.Core.Domain;
+using ZungMail.Core.Services;
 using Microsoft.Data.Sqlite;
 
 namespace ZungMail.Infrastructure.Storage;
@@ -74,14 +75,80 @@ ON CONFLICT(email_id) DO UPDATE SET
             // 行业类型与单号同一批写入：重扫时类型也会被重算（Unknown 表示这张表还没有识别结果）
             await using var type = connection.CreateCommand();
             type.Transaction = tx;
-            type.CommandText = "UPDATE messages SET mail_type = @type, mail_type_score = @score WHERE id = @email;";
+            type.CommandText = "UPDATE messages SET mail_type = @type, mail_type_score = @score, mail_type_basis = @basis WHERE id = @email;";
             type.Parameters.AddWithValue("@type", (int)entry.MailType);
             type.Parameters.AddWithValue("@score", entry.MailTypeScore);
+            type.Parameters.AddWithValue("@basis", entry.MailTypeBasis ?? "");
             type.Parameters.AddWithValue("@email", entry.EmailId);
             await type.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
         await tx.CommitAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<int> ApplyThreadInheritanceAsync(int maxUpdates = 500, CancellationToken ct = default)
+    {
+        if (maxUpdates <= 0) return 0;
+
+        await using var connection = await _factory.CreateAsync(ct).ConfigureAwait(false);
+
+        // 已确定类型的邮件按会话聚合：先用纯函数算出每个会话的赢家（异常类优先，其次多数）
+        var counts = new Dictionary<string, Dictionary<MailType, int>>(StringComparer.Ordinal);
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+SELECT thread_id, mail_type, COUNT(*)
+FROM messages
+WHERE mail_type <> 0 AND thread_id IS NOT NULL AND thread_id <> ''
+GROUP BY thread_id, mail_type;
+""";
+            await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var thread = reader.GetString(0);
+                var type = (MailType)reader.GetInt32(1);
+                var count = reader.GetInt32(2);
+
+                if (!counts.TryGetValue(thread, out var perType))
+                {
+                    counts[thread] = perType = new Dictionary<MailType, int>();
+                }
+
+                perType[type] = perType.TryGetValue(type, out var current) ? current + count : count;
+            }
+        }
+
+        var winners = new Dictionary<string, MailType>(StringComparer.Ordinal);
+        foreach (var (thread, perType) in counts)
+        {
+            var winner = MailTypeThreadInheritance.PickWinner(perType);
+            if (winner != MailType.Unknown) winners[thread] = winner;
+        }
+
+        if (winners.Count == 0) return 0;
+
+        await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var update = connection.CreateCommand();
+        update.Transaction = tx;
+        update.CommandText = """
+UPDATE messages
+SET mail_type = @type, mail_type_score = 1, mail_type_basis = 'thread:inherit'
+WHERE thread_id = @thread AND mail_type = 0;
+""";
+        var typeParameter = update.Parameters.Add("@type", SqliteType.Integer);
+        var threadParameter = update.Parameters.Add("@thread", SqliteType.Text);
+
+        var updated = 0;
+        foreach (var (thread, winner) in winners)
+        {
+            typeParameter.Value = (int)winner;
+            threadParameter.Value = thread;
+            updated += await update.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            if (updated >= maxUpdates) break;
+        }
+
+        await tx.CommitAsync(ct).ConfigureAwait(false);
+        return updated;
     }
 
     public async Task<IReadOnlyList<FreightReference>> GetForMessageAsync(long emailId, CancellationToken ct = default)
@@ -189,12 +256,12 @@ LIMIT @take;
         await using var command = connection.CreateCommand();
         command.CommandText = """
 SELECT m.id, COALESCE(m.subject, ''), COALESCE(m.preview, ''), COALESCE(m.body_text, ''),
-       CASE WHEN m.body_text IS NOT NULL AND m.body_text <> '' THEN 1 ELSE 0 END,
+       CASE WHEN m.body_state = 1 THEN 1 ELSE 0 END,
        m.date_utc
 FROM messages m
 LEFT JOIN message_ref_scan s ON s.email_id = m.id
 WHERE (m.flags & 32) = 0
-  AND (s.email_id IS NULL OR (s.body_indexed = 0 AND m.body_text IS NOT NULL AND m.body_text <> ''))
+  AND (s.email_id IS NULL OR (s.body_indexed = 0 AND m.body_state = 1))
 ORDER BY m.date_utc DESC
 LIMIT @take;
 """;
@@ -224,7 +291,7 @@ SELECT COUNT(*)
 FROM messages m
 LEFT JOIN message_ref_scan s ON s.email_id = m.id
 WHERE (m.flags & 32) = 0
-  AND (s.email_id IS NULL OR (s.body_indexed = 0 AND m.body_text IS NOT NULL AND m.body_text <> ''));
+  AND (s.email_id IS NULL OR (s.body_indexed = 0 AND m.body_state = 1));
 """;
         return Convert.ToInt32(await command.ExecuteScalarAsync(ct).ConfigureAwait(false) ?? 0);
     }
