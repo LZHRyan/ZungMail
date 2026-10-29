@@ -287,8 +287,34 @@ public partial class App : System.Windows.Application
 
         if (settings.Current.SyncOnLaunch)
         {
-            // 启动即增量同步，但不阻塞界面（同步引擎内部在后台线程执行）
-            _ = viewModel.RefreshCommand.ExecuteAsync(null);
+            // 启动即同步，但错开首屏：冷启动时首屏还在 JIT / 读盘，同步一上来就抢 CPU 与磁盘，
+            // 实测「刚看到列表就抖一下」（一次 ~910ms 的 UI 线程占用）。这里延后几秒，首屏先站稳。
+            _ = RunLaunchSyncAsync(_host.Services, viewModel);
+        }
+    }
+
+    /// <summary>首屏就绪后再等几秒才开始启动同步；退出流程里直接放弃。</summary>
+    private const int LaunchSyncDelaySeconds = 4;
+
+    private static async Task RunLaunchSyncAsync(IServiceProvider services, MainViewModel viewModel)
+    {
+        try
+        {
+            var lifetime = services.GetRequiredService<IHostApplicationLifetime>();
+            await StartupDelay.WaitAsync(TimeSpan.FromSeconds(LaunchSyncDelaySeconds), lifetime.ApplicationStopping)
+                .ConfigureAwait(true);
+
+            if (lifetime.ApplicationStopping.IsCancellationRequested) return;
+
+            await viewModel.RefreshCommand.ExecuteAsync(null).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            // 退出流程：不记错误
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("启动同步失败：" + ex.Message);
         }
     }
 
@@ -302,6 +328,9 @@ public partial class App : System.Windows.Application
         try
         {
             await Task.Yield();
+
+            // 与首屏错开：一次性回填也是一次全表扫，别在冷启动那几秒里和首屏抢磁盘
+            await StartupDelay.WaitAsync(TimeSpan.FromSeconds(6), CancellationToken.None).ConfigureAwait(false);
 
             var backfill = services.GetRequiredService<InlineDataImageBackfillService>();
             var (messages, savedChars) = await Task.Run(() => backfill.RunAsync()).ConfigureAwait(false);
@@ -327,6 +356,9 @@ public partial class App : System.Windows.Application
         try
         {
             await Task.Yield();
+
+            // 同上：首批补扫会读到 500 封正文，等首屏站稳再跑
+            await StartupDelay.WaitAsync(TimeSpan.FromSeconds(8), CancellationToken.None).ConfigureAwait(false);
 
             var service = services.GetRequiredService<MailReferenceService>();
             var processed = await service.EnsureRecallBackfillAsync().ConfigureAwait(false);

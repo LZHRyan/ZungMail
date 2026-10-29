@@ -363,8 +363,13 @@ public static partial class HtmlMailDocumentBuilder
             .Append("--font-size:").Append(size.ToString("0.#", CultureInfo.InvariantCulture)).Append("px;")
             .Append('}');
         css.Append("html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);}");
-        css.Append("body{font-family:'Segoe UI','Microsoft YaHei UI','Microsoft YaHei',system-ui,-apple-system,'Noto Sans CJK SC',sans-serif;");
+        css.Append("body{font-family:").Append(MailBodyTypography.CssFontStack).Append(';');
         css.Append("font-size:var(--font-size);line-height:1.7;-webkit-text-size-adjust:100%;}");
+        // 统一字族：邮件自带的 font-family（Word 的宋体/Calibri、<font face>、中英混排）一律压掉，
+        // 只统一字族，字号与颜色仍按邮件原样式；代码块保持等宽。
+        css.Append("#mail-root,#mail-root *{font-family:").Append(MailBodyTypography.CssFontStack).Append(" !important;}");
+        css.Append("#mail-root pre,#mail-root code,#mail-root kbd,#mail-root samp,#mail-root tt{font-family:")
+            .Append(MailBodyTypography.CssMonospaceStack).Append(" !important;}");
         css.Append("#mail-root{max-width:100%;padding:2px 22px 28px 22px;box-sizing:border-box;overflow-wrap:anywhere;}");
         // 邮件自带样式可能禁用选中；阅读器始终允许选中正文并复制
         css.Append("#mail-root,#mail-root *{-webkit-user-select:text !important;user-select:text !important;}");

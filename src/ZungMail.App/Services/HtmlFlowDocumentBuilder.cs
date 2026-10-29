@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
+using ZungMail.Core.Services;
 
 namespace ZungMail.App.Services;
 
@@ -32,7 +33,8 @@ internal static class HtmlFlowDocumentBuilder
     /// <summary>解析并构建文档；HTML 为空或解析失败时返回 false，调用方回退到纯文本。</summary>
     public static bool TryBuild(string? html, bool isDark, double baseFontSize, out FlowDocument document)
     {
-        document = new FlowDocument { PagePadding = new Thickness(0) };
+        // 统一字族：整篇文档一个字体栈，邮件自带的 font-family / <font face> 一律忽略（字号颜色仍保留）
+        document = new FlowDocument { PagePadding = new Thickness(0), FontFamily = BodyFontFamily };
         if (string.IsNullOrWhiteSpace(html)) return false;
 
         try
@@ -476,9 +478,7 @@ internal static class HtmlFlowDocumentBuilder
             if (!_isDark && !string.IsNullOrWhiteSpace(color) && TryParseBrush(color) is { } brush)
                 style.Foreground = brush;
 
-            var face = element.GetAttribute("face");
-            if (!string.IsNullOrWhiteSpace(face))
-                style.FontFamily = new FontFamily(face.Split(',')[0].Trim().Trim('\'', '"'));
+            // <font face> 不再生效：正文统一字体（颜色与 size 仍按原邮件保留）
 
             var size = ParseInt(element.GetAttribute("size"));
             if (size is >= 1 and <= 7)
@@ -690,8 +690,7 @@ internal static class HtmlFlowDocumentBuilder
                         break;
 
                     case "font-family":
-                        var family = value.Split(',')[0].Trim().Trim('\'', '"');
-                        if (family.Length > 0) style.FontFamily = new FontFamily(family);
+                        // 忽略邮件自带字族：正文统一字体（字号颜色不受影响）
                         break;
 
                     case "color":
@@ -849,7 +848,10 @@ internal static class HtmlFlowDocumentBuilder
 
     // ---------------- 解析工具 ----------------
 
-    private static readonly FontFamily MonospaceFamily = new("Consolas, Courier New");
+    /// <summary>正文统一字体（与 WebView2 路径同一份声明，见 MailBodyTypography）。</summary>
+    internal static readonly FontFamily BodyFontFamily = new(MailBodyTypography.WpfFontFamily);
+
+    private static readonly FontFamily MonospaceFamily = new(MailBodyTypography.WpfMonospaceFamily);
 
     private static bool TryParseSelector(string selector, out CssRule rule)
     {

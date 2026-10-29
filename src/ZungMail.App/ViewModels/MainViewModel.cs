@@ -2161,6 +2161,38 @@ public sealed partial class MainViewModel : ObservableObject
         return query;
     }
 
+    /// <summary>列表副标题：「共 N 封/会话 · 第 x/y 页」。</summary>
+    private string BuildListSubtitle(int total)
+    {
+        var countText = ConversationMode
+            ? $"{total} 个会话 · 第 {CurrentPage}/{TotalPages} 页"
+            : $"共 {total} 封 · 第 {CurrentPage}/{TotalPages} 页";
+
+        return IsSearchResults
+            ? (IsSearchScopeAllMail ? "所有邮件 · " : "当前文件夹 · ") + countText
+            : countText;
+    }
+
+    /// <summary>
+    /// 新查出来的一页与当前列表是否完全一致（id、标志位、类型）。
+    /// 一致时跳过整批替换，避免同步后无意义地重建一整页行容器。
+    /// </summary>
+    private bool MatchesCurrentPage(IReadOnlyList<MailRow> rows)
+    {
+        if (rows.Count != Messages.Count) return false;
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var current = Messages[i].Model;
+            var incoming = rows[i].Model;
+            if (current.Id != incoming.Id) return false;
+            if (current.Flags != incoming.Flags) return false;
+            if (current.IndustryType != incoming.IndustryType) return false;
+        }
+
+        return true;
+    }
+
     private async Task ReloadMessagesAsync(bool append = false)
     {
         var version = ++_loadVersion;
@@ -2212,23 +2244,31 @@ public sealed partial class MainViewModel : ObservableObject
             StartupTrace.Mark($"列表查询 {rows.Count} 行/共 {total} 封");
 
             TotalCount = total;
-            // 整批替换：逐条 Add 会给 ListBox 发 500 次通知，每次都要重排
-            using (UiThreadProbe.Measure("列表替换"))
+
+            // 同步后的刷新大多「内容一模一样」：这时重建 100 个行容器纯属浪费（实测一次 809ms 重绘）。
+            // 只在整页加载（非追加）且 id/标志位/类型都没变时跳过替换，后面的选中/副标题/停止加载态照常走。
+            var unchanged = !append && MatchesCurrentPage(rows);
+
+            System.Diagnostics.Stopwatch? paintWatch = null;
+            if (unchanged)
             {
-                Messages.ReplaceAll(rows);
+                StartupTrace.Mark("列表 未变化（跳过重建）");
+            }
+            else
+            {
+                // 整批替换：逐条 Add 会给 ListBox 发 500 次通知，每次都要重排
+                using (UiThreadProbe.Measure("列表替换"))
+                {
+                    Messages.ReplaceAll(rows);
+                }
+
+                // 归因用：填行到真正绘制完成之间是「行容器 realize + 布局 + 渲染」，跨 Dispatcher，只能用补记
+                paintWatch = System.Diagnostics.Stopwatch.StartNew();
+                StartupTrace.Mark("列表 填行");
             }
 
-            // 归因用：填行到真正绘制完成之间是「行容器 realize + 布局 + 渲染」，跨 Dispatcher，只能用补记
-            var paintWatch = System.Diagnostics.Stopwatch.StartNew();
-            StartupTrace.Mark("列表 填行");
-
             IsEmpty = Messages.Count == 0;
-            var countText = ConversationMode
-                ? $"{total} 个会话 · 第 {CurrentPage}/{TotalPages} 页"
-                : $"共 {total} 封 · 第 {CurrentPage}/{TotalPages} 页";
-            ListSubtitle = IsSearchResults
-                ? (IsSearchScopeAllMail ? "所有邮件 · " : "当前文件夹 · ") + countText
-                : countText;
+            ListSubtitle = BuildListSubtitle(total);
 
             // 列表先上屏：标签 / 业务单号徽标另起后台任务补齐，不挡首屏。
             IsListLoading = false;
@@ -2237,9 +2277,11 @@ public sealed partial class MainViewModel : ObservableObject
             else SelectedRow = null;
             StartupTrace.Mark("列表 选中");
 
+            if (unchanged) return;
+
             await LetUiRenderAsync();
             StartupTrace.Mark("列表上屏");
-            UiThreadProbe.Record("列表填行→上屏（行容器 realize + 布局 + 渲染）", paintWatch.ElapsedMilliseconds);
+            UiThreadProbe.Record("列表填行→上屏（行容器 realize + 布局 + 渲染）", paintWatch!.ElapsedMilliseconds);
             FireAndForget.Run(() => LoadRowBadgesAsync(rows, version), "补齐行徽标");
         }
         catch (Exception ex)

@@ -21,6 +21,24 @@ public sealed class HtmlMailDocumentBuilderTests
     }
 
     [Fact]
+    public void 正文统一字体_邮件自带的font_family被强制覆盖()
+    {
+        var detail = new EmailDetail
+        {
+            BodyHtml = "<p style=\"font-family:宋体\">正文</p><font face=\"Arial\">另一段</font>"
+        };
+
+        var html = HtmlMailDocumentBuilder.Build(detail, Default);
+
+        // 统一字族：即使邮件自带 font-family / <font face>，也要被 !important 压掉
+        Assert.Contains("#mail-root,#mail-root *{font-family:" + MailBodyTypography.CssFontStack + " !important;}", html);
+        // 代码块保留等宽
+        Assert.Contains("font-family:" + MailBodyTypography.CssMonospaceStack + " !important;", html);
+        // 只统一字族：字号仍走变量（邮件字号未被替换成固定值）
+        Assert.Contains("font-size:var(--font-size)", html);
+    }
+
+    [Fact]
     public void 无HTML时_使用纯文本生成段落()
     {
         var detail = new EmailDetail { BodyText = "第一行\n第二行" };

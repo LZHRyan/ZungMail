@@ -437,7 +437,12 @@ public partial class MailBodyView : UserControl
             return;
         }
 
-        var document = new FlowDocument { PagePadding = new Thickness(0) };
+        // 纯文本位面同样用统一字体（与 HTML 路径、富文本降级同一份声明）
+        var document = new FlowDocument
+        {
+            PagePadding = new Thickness(0),
+            FontFamily = HtmlFlowDocumentBuilder.BodyFontFamily
+        };
 
         if (!richAllowed)
         {
